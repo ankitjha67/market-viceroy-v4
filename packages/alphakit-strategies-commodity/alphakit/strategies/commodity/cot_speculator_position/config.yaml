@@ -1,0 +1,60 @@
+# Default configuration for cot_speculator_position.
+#
+# Contrarian CFTC COT speculator-positioning trade. Long when
+# speculators are extreme-short (bottom decile of 3-year history);
+# short when speculators are extreme-long (top decile); flat
+# otherwise.
+#
+# Per Bessembinder 1992 / de Roon-Nijman-Veld 2000 hedging-pressure
+# framework: extreme speculator positioning crowds out the premium
+# and forecasts mean reversion in futures returns.
+#
+# CRITICAL: COT data has a Friday-for-Tuesday publication lag that
+# the implementation enforces via a 3-day signal shift. Users
+# running on real CFTC data must align ingestion accordingly.
+
+strategy: cot_speculator_position
+family: commodity
+paper_doi: "10.1111/0022-1082.00253"
+
+universe:
+  - "CL=F"          # Crude oil — traded leg
+  - "NG=F"          # Natural gas — traded leg
+  - "GC=F"          # Gold — traded leg
+  - "ZC=F"          # Corn — traded leg
+
+position_columns:
+  # Non-commercial long-fraction-of-OI series — must be in (0, 1].
+  # Naming uses the _NET_SPEC suffix for backward compatibility but
+  # the convention is long_fraction = NC_long / open_interest, not
+  # raw signed net positioning. See README.md for the ingestion
+  # convention.
+  - "CL=F_NET_SPEC"
+  - "NG=F_NET_SPEC"
+  - "GC=F_NET_SPEC"
+  - "ZC=F_NET_SPEC"
+
+front_to_position_map:
+  "CL=F": "CL=F_NET_SPEC"
+  "NG=F": "NG=F_NET_SPEC"
+  "GC=F": "GC=F_NET_SPEC"
+  "ZC=F": "ZC=F_NET_SPEC"
+
+# Signal parameters
+percentile_lookback_weeks: 156   # ~3 years of weekly COT reports
+extreme_long_threshold: 90.0     # speculators in top decile → short
+extreme_short_threshold: 10.0    # speculators in bottom decile → long
+cot_lag_days: 3                  # Friday-for-Tuesday lag + 1-day buffer
+
+# Portfolio mechanics
+long_only: false                 # contrarian: long and short legs
+rebalance: weekly                # COT publishes Friday, signal updates weekly
+
+meta:
+  paper_doi: "10.1111/0022-1082.00253"
+  paper_url: "https://doi.org/10.1111/0022-1082.00253"
+  foundational_paper_doi: "10.1093/rfs/5.4.637"
+  foundational_paper_url: "https://doi.org/10.1093/rfs/5.4.637"
+  cftc_publication: "Friday 15:30 ET, covers Tuesday close"
+  cftc_data_source: "https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm"
+  last_validated_against_data_through: "2025-12-31"

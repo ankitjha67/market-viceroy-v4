@@ -1,0 +1,13 @@
+strategy: crypto_funding_carry
+family: carry
+paper_doi: "crypto-native-no-formal-doi"
+
+universe:
+  - BTC
+  - ETH
+
+fast_period: 5
+slow_period: 30
+threshold: 0.005
+long_only: false
+rebalance: daily

@@ -1,0 +1,31 @@
+# Default configuration for global_inflation_momentum.
+#
+# Cross-country inflation-momentum-driven bond tilt. The input must
+# pair CPI proxies with country bond proxies via column-naming
+# convention: each country provides both a CPI_<country> series
+# and a BOND_<country> series.
+
+strategy: global_inflation_momentum
+family: rates
+paper_doi: "10.3905/jpm.2014.40.3.087"
+
+# Real-feed Session 2H universe target — paired CPI + bond proxies
+# across G3 (US/Germany/Japan) at minimum, expanded to G10 if data
+# permits. Fixture-only fallback uses subset of available proxies.
+universe:
+  - CPI_US     # FRED CPIAUCSL or equivalent (or fixture fallback)
+  - CPI_DE     # FRED CPHPTT01DEM659N (Germany HICP YoY)
+  - CPI_JP     # FRED CPALTT01JPM659N (Japan CPI YoY)
+  - BOND_US    # IEF or DGS10 proxy
+  - BOND_DE    # German Bund proxy
+  - BOND_JP    # JGB 10Y proxy
+
+cpi_lookback_months: 12
+
+rebalance: monthly
+
+meta:
+  paper_doi: "10.3905/jpm.2014.40.3.087"
+  paper_url: "https://doi.org/10.3905/jpm.2014.40.3.087"
+  foundational_book_isbn: "978-1119990727"  # Ilmanen 2011, Wiley
+  last_validated_against_data_through: "2025-12-31"

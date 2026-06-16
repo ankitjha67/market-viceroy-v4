@@ -1,0 +1,19 @@
+[project]
+name = "mv-postmortem"
+version = "0.0.1"
+description = "Attribution, mistake taxonomy, counterfactual replay, improvement ledger, and governed meta-learning."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.12"
+authors = [{ name = "Ankit Jha" }]
+dependencies = [
+    "pydantic>=2.7",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mv"]
+exclude = ["**/tests/**"]

@@ -1,0 +1,9 @@
+# Normalize line endings to LF in the repo. Without this, a Windows checkout
+# can introduce CRLF and break `ruff format --check` on the Linux CI runner.
+* text=auto eol=lf
+
+# Binary / generated — never normalize.
+*.png binary
+*.jpg binary
+*.parquet binary
+uv.lock text eol=lf linguist-generated=true

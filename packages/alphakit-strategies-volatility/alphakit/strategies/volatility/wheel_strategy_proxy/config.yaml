@@ -1,0 +1,12 @@
+strategy: wheel_strategy_proxy
+family: volatility
+paper_doi: "practitioner-no-formal-doi"
+universe:
+  - SPY
+  - EFA
+  - AGG
+target_vol: 0.10
+vol_lookback: 20
+max_leverage: 1.5
+long_only: false
+rebalance: daily

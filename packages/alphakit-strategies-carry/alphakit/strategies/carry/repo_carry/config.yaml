@@ -1,0 +1,12 @@
+strategy: repo_carry
+family: carry
+paper_doi: "10.1111/j.1540-6261.1996.tb02708.x"
+universe:
+  - US10Y
+  - US2Y
+  - DE10Y
+  - JP10Y
+lookback: 60
+threshold: 1.0
+long_only: false
+rebalance: daily

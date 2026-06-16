@@ -1,0 +1,32 @@
+{
+  "slug": "skew_reversal",
+  "status": "populated",
+  "note": "\u26a0 SUBSTRATE CAVEAT \u2014 synthetic chain has FLAT IV; the put-skew z-score this strategy monitors is structurally zero; the trigger NEVER fires; this backtest is a degenerate no-trade case (final equity = initial cash exactly). Strategy ships for Phase 3 real-feed verification (Polygon, ADR-004 stub). The synthetic-chain Sharpe is 0.0 by design.",
+  "benchmark_date": "2026-05-06",
+  "data_start": "2005-01-01",
+  "in_sample_end": "2019-12-31",
+  "out_of_sample_end": "2025-12-31",
+  "universe": [
+    "SPY"
+  ],
+  "metrics": {
+    "sharpe": 0.0,
+    "sortino": 0.0,
+    "calmar": 0.0,
+    "max_drawdown": 0.0,
+    "annualized_return": 0.0,
+    "annualized_vol": 0.0,
+    "turnover_annual": 0.0,
+    "capacity_usd_bn": 0.0
+  },
+  "regime_performance": {
+    "bull_market_sharpe": 0.0,
+    "bear_market_sharpe": 0.0,
+    "sideways_sharpe": 0.0
+  },
+  "transaction_costs_assumed_bps": 5.0,
+  "commit_sha": "7bda4c6ffcfb",
+  "engine": "vectorbt",
+  "data_source": "synthetic-fixture",
+  "substrate_caveat": "flat-IV synthetic chain \u2014 trigger never fires; degenerate no-trade backtest; Phase 3 Polygon required for meaningful evaluation"
+}

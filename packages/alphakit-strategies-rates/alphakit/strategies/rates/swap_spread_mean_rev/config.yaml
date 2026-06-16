@@ -1,0 +1,27 @@
+# Default configuration for swap_spread_mean_rev.
+#
+# Mean-reversion on the swap-Treasury basis. Trades the deviation
+# of the log-price spread from its 252-day rolling mean in both
+# directions.
+
+strategy: swap_spread_mean_rev
+family: rates
+paper_doi: "10.1093/rfs/hhl026"
+
+universe:
+  - IEF       # Treasury proxy (7-10Y)
+  - IRS_10Y   # Swap-rate proxy (no liquid US-listed ETF; real-feed
+              # construction from FRED ICE swap rate is required)
+
+zscore_window: 252
+entry_threshold: 1.0
+exit_threshold: 0.25
+
+rebalance: daily
+
+meta:
+  paper_doi: "10.1093/rfs/hhl026"
+  paper_url: "https://doi.org/10.1093/rfs/hhl026"
+  foundational_paper_doi: "10.1086/505250"
+  foundational_paper_url: "https://doi.org/10.1086/505250"
+  last_validated_against_data_through: "2025-12-31"

@@ -1,0 +1,15 @@
+strategy: country_cape_rotation
+family: value
+paper_doi: "10.2139/ssrn.2129474"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+lookback: 2520
+long_only: false
+rebalance: monthly

@@ -1,0 +1,37 @@
+# Default configuration for wti_brent_spread.
+#
+# Pairs-trading on the WTI-Brent crude oil spread. Long the spread
+# (long WTI, short Brent) when the rolling z-score is < -2σ; short
+# the spread when z > +2σ; flat when |z| < 0.5σ. Per Gatev/
+# Goetzmann/Rouwenhorst 2006 pairs-trading framework applied to
+# the WTI-Brent cointegration documented in Reboredo 2011.
+
+strategy: wti_brent_spread
+family: commodity
+paper_doi: "10.1016/j.eneco.2011.04.006"
+
+universe:
+  - "CL=F"     # WTI (Cushing, OK)
+  - "BZ=F"     # Brent (North Sea)
+
+# Symbols (override if using non-default ticker names)
+wti_symbol: "CL=F"
+brent_symbol: "BZ=F"
+
+# Pairs-trading parameters (GGR §III)
+zscore_lookback_days: 252        # ~1 year — adapts to slow shifts in cointegration mean
+entry_threshold: 2.0
+exit_threshold: 0.5
+
+# 1:1 dollar-neutral pair: per-leg weight ±0.5
+
+# Portfolio mechanics
+long_only: false
+rebalance: daily
+
+meta:
+  paper_doi: "10.1016/j.eneco.2011.04.006"
+  paper_url: "https://doi.org/10.1016/j.eneco.2011.04.006"
+  foundational_paper_doi: "10.1093/rfs/hhj020"
+  foundational_paper_url: "https://doi.org/10.1093/rfs/hhj020"
+  last_validated_against_data_through: "2025-12-31"

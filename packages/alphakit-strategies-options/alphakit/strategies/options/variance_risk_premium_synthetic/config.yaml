@@ -1,0 +1,21 @@
+strategy: variance_risk_premium_synthetic
+family: options
+paper_doi: "10.1093/rfs/hhn038"
+
+universe:
+  - "SPY"
+
+underlying_symbol: "SPY"
+rebalance: monthly
+
+meta:
+  paper_doi: "10.1093/rfs/hhn038"
+  paper_url: "https://doi.org/10.1093/rfs/hhn038"
+  foundational_paper_doi: "10.1142/S2010139214500050"
+  foundational_paper_url: "https://doi.org/10.1142/S2010139214500050"
+  feed: "synthetic-options + yfinance"
+  primary_methodology: "Carr-Wu §2 variance-swap-replication formula (2-leg ATM-straddle approximation)"
+  data_fidelity: "Synthetic chain via Black-Scholes (ADR-005). 2-leg ATM straddle approximates the full multi-strike Carr-Wu §2 replication. Real-feed Polygon verification with denser strike grid deferred to Phase 3."
+  bridge_integration: "2 short-leg discrete dispatch (ATM call + ATM put). Composition wrapper combining CoveredCallSystematic(otm_pct=0) + CashSecuredPutSystematic(otm_pct=0)."
+  vrp_side: "short-vol; expected POSITIVE return per Bondarenko 2014"
+  last_validated_against_data_through: "2025-12-31"

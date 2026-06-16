@@ -1,0 +1,16 @@
+strategy: bollinger_reversion
+family: meanrev
+paper_doi: "0-07-137368-3"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+period: 20
+num_std: 2.0
+long_only: false
+rebalance: daily

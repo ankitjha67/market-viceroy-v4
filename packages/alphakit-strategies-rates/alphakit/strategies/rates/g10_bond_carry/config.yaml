@@ -1,0 +1,39 @@
+# Default configuration for g10_bond_carry.
+#
+# Cross-sectional sovereign bond carry across G10 markets. The
+# real-feed Session 2H benchmark should construct FX-hedged USD-
+# equivalent return series from FRED's IRLTLT01XXM156N (long-term
+# yields by country) and FX forwards. The fixture-based default
+# universe substitutes liquid USD-denominated proxies because the
+# G10-specific ETFs (BWX, IGOV, etc.) are not in the synthetic
+# fixture profiles.
+
+strategy: g10_bond_carry
+family: rates
+paper_doi: "10.1111/jofi.12021"
+
+universe:
+  # Real-feed target universe (Session 2H): G10 sovereign bond ETFs.
+  # Fixture fallback: US-only bond ETFs as proxy.
+  - TLT  # US 20+Y (proxy for US 10Y)
+  - AGG  # US aggregate (proxy for blended G10)
+  - HYG  # US HY (proxy for risky-rates / EM-like exposure)
+
+# Asness §V uses a short carry-evaluation window because the signal
+# is a slow-moving macro variable.
+lookback_months: 3
+
+# durations: omitted by default (all bonds assumed similar duration).
+# When working with real-feed data spanning materially-different
+# durations, set this map explicitly. Example:
+# durations:
+#   IGOV: 8.0
+#   BWX: 7.5
+#   LEMB: 6.0
+
+rebalance: monthly
+
+meta:
+  paper_doi: "10.1111/jofi.12021"
+  paper_url: "https://doi.org/10.1111/jofi.12021"
+  last_validated_against_data_through: "2025-12-31"

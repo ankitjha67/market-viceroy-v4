@@ -1,0 +1,15 @@
+strategy: bond_carry_roll
+family: carry
+paper_doi: "10.1016/j.jfineco.2017.11.002"
+
+universe:
+  - US10Y
+  - DE10Y
+  - JP10Y
+  - GB10Y
+  - AU10Y
+  - CA10Y
+
+lookback: 63
+long_only: false
+rebalance: monthly

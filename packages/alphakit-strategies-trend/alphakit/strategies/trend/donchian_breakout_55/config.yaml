@@ -1,0 +1,16 @@
+strategy: donchian_breakout_55
+family: trend
+paper_doi: "10.2469/faj.v16.n6.133"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+entry_window: 55
+exit_window: 20
+long_only: false
+rebalance: daily

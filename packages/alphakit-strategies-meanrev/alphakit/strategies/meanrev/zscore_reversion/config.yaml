@@ -1,0 +1,16 @@
+strategy: zscore_reversion
+family: meanrev
+paper_doi: "978-1-118-46014-6"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+lookback: 20
+threshold: 2.0
+long_only: false
+rebalance: daily

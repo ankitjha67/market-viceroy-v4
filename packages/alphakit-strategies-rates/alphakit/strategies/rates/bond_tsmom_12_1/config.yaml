@@ -1,0 +1,38 @@
+# Default configuration for bond_tsmom_12_1.
+#
+# Time-series momentum on a single 10Y treasury bond return series.
+# Matches the 12/1 lookback rule from Moskowitz/Ooi/Pedersen (2012)
+# and Asness/Moskowitz/Pedersen (2013) §V.
+#
+# The default universe is the iShares 20+ Year Treasury Bond ETF (TLT)
+# because it is a real, tradeable, total-return-adjusted instrument
+# with daily prices on yfinance. When only FRED's DGS10 (constant-
+# maturity yield) is available, callers convert yield to a price-like
+# series via the duration approximation documented in paper.md.
+
+strategy: bond_tsmom_12_1
+family: rates
+paper_doi: "10.1111/jofi.12021"
+
+universe:
+  - TLT  # iShares 20+ Year Treasury Bond ETF (proxy for long-duration)
+
+# Signal parameters
+lookback_months: 12
+skip_months: 1
+threshold: 0.0
+
+# Portfolio mechanics
+long_only: false
+rebalance: monthly
+
+# Provenance metadata. ``last_validated_against_data_through`` records
+# the most recent date the synthetic-fixture benchmark was computed
+# against; the real-feed benchmark (Session 2H) will replace this with
+# the FRED data cut-off.
+meta:
+  paper_doi: "10.1111/jofi.12021"
+  paper_url: "https://doi.org/10.1111/jofi.12021"
+  foundational_paper_doi: "10.1016/j.jfineco.2011.11.003"
+  foundational_paper_url: "https://doi.org/10.1016/j.jfineco.2011.11.003"
+  last_validated_against_data_through: "2025-12-31"

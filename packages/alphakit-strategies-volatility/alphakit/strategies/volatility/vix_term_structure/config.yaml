@@ -1,0 +1,11 @@
+strategy: vix_term_structure
+family: volatility
+paper_doi: "10.3905/jot.2014.9.3.064"
+universe:
+  - SPY
+  - EFA
+  - AGG
+short_vol_window: 5
+long_vol_window: 60
+long_only: false
+rebalance: daily

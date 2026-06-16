@@ -1,0 +1,41 @@
+# Default configuration for crush_spread.
+#
+# Soybean-crush-spread mean-reversion trade. Long the crush (long
+# meal + oil, short soybeans) when the rolling z-score is < -2σ;
+# short the crush when z > +2σ; flat when |z| < 0.5σ. Per Simon
+# 1999 risk-arbitrage framework on the 1:1.5:0.8 bushel-equivalent
+# ratio.
+
+strategy: crush_spread
+family: commodity
+paper_doi: "10.1002/(SICI)1096-9934(199905)19:3<271::AID-FUT2>3.0.CO;2-S"
+
+universe:
+  - "ZS=F"     # Soybeans
+  - "ZM=F"     # Soybean meal
+  - "ZL=F"     # Soybean oil
+
+# Symbols (override if using non-default ticker names)
+soybean_symbol: "ZS=F"
+meal_symbol: "ZM=F"
+oil_symbol: "ZL=F"
+
+# Mean-reversion parameters (Simon §IV)
+zscore_lookback_days: 252        # ~1 year — covers 5+ mean-reversion half-lives
+entry_threshold: 2.0
+exit_threshold: 0.5
+
+# 1:1.5:0.8 ratio (hardcoded in strategy.py)
+# - 1 bushel soybeans in
+# - 1.5 units soybean meal + 0.8 units soybean oil out
+# Per-leg gross weight: 0.303 / 0.455 / 0.242 (sums to 1.0)
+
+# Portfolio mechanics
+long_only: false
+rebalance: daily
+
+meta:
+  paper_doi: "10.1002/(SICI)1096-9934(199905)19:3<271::AID-FUT2>3.0.CO;2-S"
+  paper_url: "https://doi.org/10.1002/(SICI)1096-9934(199905)19:3<271::AID-FUT2>3.0.CO;2-S"
+  foundational_paper: "Working 1949 — The Theory of Price of Storage, AER 39(6)"
+  last_validated_against_data_through: "2025-12-31"

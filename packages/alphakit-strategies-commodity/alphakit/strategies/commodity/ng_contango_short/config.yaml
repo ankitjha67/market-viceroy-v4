@@ -1,0 +1,35 @@
+# Default configuration for ng_contango_short.
+#
+# Short-only carry on natural gas. Short the front-month contract
+# when the smoothed front-vs-next roll yield is negative (contango);
+# flat otherwise.
+#
+# Per Bessembinder 1992 / Erb-Harvey 2006 §III applied to the
+# canonical-most-contangoed commodity. NG carries a persistent
+# producer-hedging-pressure premium that long-only investors pay
+# and short-side speculators harvest.
+
+strategy: ng_contango_short
+family: commodity
+paper_doi: "10.2469/faj.v62.n2.4084"
+
+universe:
+  - "NG=F"    # Front-month NG (traded leg)
+  - "NG2=F"   # Next-listed-month NG (signal only, not traded)
+
+# Signal parameters
+front_symbol: "NG=F"
+next_symbol: "NG2=F"
+smoothing_days: 21               # ~1 month rolling mean of roll yield
+contango_threshold: 0.0          # any negative smoothed roll yield → short
+
+# Portfolio mechanics
+long_only: false                 # short-only, asymmetric to wti_backwardation_carry
+rebalance: daily                 # signal recomputed every trading day
+
+meta:
+  paper_doi: "10.2469/faj.v62.n2.4084"
+  paper_url: "https://doi.org/10.2469/faj.v62.n2.4084"
+  foundational_paper_doi: "10.1093/rfs/5.4.637"
+  foundational_paper_url: "https://doi.org/10.1093/rfs/5.4.637"
+  last_validated_against_data_through: "2025-12-31"

@@ -1,0 +1,34 @@
+# Default configuration for duration_targeted_momentum.
+#
+# Cross-sectional 12-1 momentum on Treasury bond ETFs, with each
+# bond's lookback return divided by its modified duration before
+# ranking. The default universe spans the short/medium/long
+# segments of the curve so the cross-section actually has dispersion.
+
+strategy: duration_targeted_momentum
+family: rates
+paper_doi: "10.17016/FEDS.2015.103"
+
+universe:
+  - SHY  # 1-3 Year Treasury Bond ETF
+  - IEF  # 7-10 Year Treasury Bond ETF
+  - TLT  # 20+ Year Treasury Bond ETF
+
+# 12-1 lookback (Asness/Moskowitz/Pedersen 2013 §V convention)
+lookback_months: 12
+skip_months: 1
+
+# ETF effective durations — different from the constant-maturity
+# Treasury durations used in the curve strategies in this family.
+# IEF (7-10Y) ≈ 8 years; TLT (20+Y) ≈ 17 years.
+durations:
+  SHY: 1.95
+  IEF: 8.0
+  TLT: 17.0
+
+rebalance: monthly
+
+meta:
+  paper_doi: "10.17016/FEDS.2015.103"
+  paper_url: "https://www.federalreserve.gov/econresdata/feds/2015/files/2015103pap.pdf"
+  last_validated_against_data_through: "2025-12-31"

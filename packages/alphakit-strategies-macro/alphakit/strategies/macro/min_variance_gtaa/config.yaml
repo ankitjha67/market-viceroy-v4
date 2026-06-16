@@ -1,0 +1,34 @@
+# Default configuration for min_variance_gtaa.
+#
+# Long-only minimum-variance portfolio on the same 3-asset risk-parity
+# universe as risk_parity_erc_3asset (SPY / TLT / DBC). Shares the
+# covariance estimator (_covariance.rolling_covariance) with the other
+# two Session 2G covariance-primitive strategies — only the solver
+# objective differs (minimum variance instead of ERC / max-div).
+
+strategy: min_variance_gtaa
+family: macro
+paper_doi: "10.3905/jpm.1991.409335"
+
+universe:
+  - "SPY"   # US large-cap equity
+  - "TLT"   # 20+ year Treasuries
+  - "DBC"   # Broad commodities (Invesco DB)
+
+# Covariance estimator (same as risk_parity_erc_3asset)
+cov_window_days: 252
+shrinkage: "ledoit_wolf"
+
+# Long-only constraint + per-asset weight cap
+max_weight: 1.0
+
+# Portfolio mechanics
+long_only: true
+rebalance: monthly
+
+meta:
+  paper_doi: "10.3905/jpm.1991.409335"
+  paper_url: "https://doi.org/10.3905/jpm.1991.409335"
+  foundational_paper_doi: "10.3905/jpm.2006.661366"
+  foundational_paper_url: "https://doi.org/10.3905/jpm.2006.661366"
+  last_validated_against_data_through: "2025-12-31"

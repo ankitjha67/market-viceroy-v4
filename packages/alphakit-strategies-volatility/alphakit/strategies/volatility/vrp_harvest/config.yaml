@@ -1,0 +1,12 @@
+strategy: vrp_harvest
+family: volatility
+paper_doi: "10.1093/rfs/hhn038"
+universe:
+  - SPY
+  - EFA
+  - AGG
+fast_vol_window: 5
+slow_vol_window: 60
+target_vol: 0.10
+long_only: false
+rebalance: daily

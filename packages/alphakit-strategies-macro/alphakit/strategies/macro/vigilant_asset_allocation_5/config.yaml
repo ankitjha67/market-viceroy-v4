@@ -1,0 +1,36 @@
+# Default configuration for vigilant_asset_allocation_5.
+#
+# Keller-Keuning (2017) VAA on a 5-ETF universe: 4 offensive risky
+# assets (SPY/EFA/EEM/AGG, also serving as canary) + 1 defensive
+# cash-bucket (SHY). 13612W weighted momentum score per ETF; if
+# any offensive score is non-positive, the portfolio goes 100%
+# defensive. Otherwise the top-scoring offensive ETF receives the
+# full 1.0 allocation.
+
+strategy: vigilant_asset_allocation_5
+family: macro
+paper_doi: "10.2139/ssrn.3002624"
+
+universe:
+  # Offensive (4 risky, also serve as canary)
+  - "SPY"   # US large-cap equity
+  - "EFA"   # International developed equity (MSCI EAFE)
+  - "EEM"   # Emerging-markets equity (MSCI EM)
+  - "AGG"   # US aggregate bonds (intermediate duration)
+  # Defensive (1 cash-bucket)
+  - "SHY"   # 1-3y Treasuries (cash proxy)
+
+# 13612W score weights (Keller-Keuning 2017)
+score_weights: [12, 4, 2, 1]
+lookbacks_months: [1, 3, 6, 12]
+
+# Portfolio mechanics
+long_only: true
+rebalance: monthly
+
+meta:
+  paper_doi: "10.2139/ssrn.3002624"
+  paper_url: "https://doi.org/10.2139/ssrn.3002624"
+  foundational_paper_doi: "10.2139/ssrn.2543979"
+  foundational_paper_url: "https://doi.org/10.2139/ssrn.2543979"
+  last_validated_against_data_through: "2025-12-31"

@@ -1,0 +1,23 @@
+strategy: vix_3m_basis
+family: options
+paper_doi: "10.1016/j.jimonfin.2015.10.005"
+
+universe:
+  - "^VIX"
+  - "^VIX3M"
+
+spot_symbol: "^VIX"
+longer_symbol: "^VIX3M"
+rebalance: daily
+
+meta:
+  paper_doi: "10.1016/j.jimonfin.2015.10.005"
+  paper_url: "https://doi.org/10.1016/j.jimonfin.2015.10.005"
+  foundational_paper_doi: "10.3905/JPM.2009.35.2.098"
+  feed: "yfinance (^VIX, ^VIX3M caret-prefix passthrough)"
+  reframed_from: "vix_front_back_spread"
+  reframe_rationale: "yfinance has no back-month VIX futures; reframed to spot vs 3-month constant-maturity index basis per Alexander et al. 2015. See docs/phase-2-amendments.md 2026-05-01."
+  data_fidelity: "Both legs are CBOE indices (^VIX, ^VIX3M). Real production requires VXZ ETN (or similar tradeable proxy) for the 3-month leg. yfinance passthrough verification deferred to Session 2H."
+  bridge_integration: "Composition wrapper over VIXTermStructureRoll with ^VIX3M instead of VIX=F. Standard TargetPercent dispatch; no discrete legs."
+  cluster_overlap: "ρ ≈ 0.55-0.75 with vix_term_structure_roll (different tenor of same basis-trade family)"
+  last_validated_against_data_through: "2025-12-31"

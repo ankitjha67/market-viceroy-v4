@@ -1,0 +1,11 @@
+strategy: vix_roll_short
+family: volatility
+paper_doi: "10.2139/ssrn.2043061"
+universe:
+  - SPY
+  - EFA
+  - AGG
+vol_lookback: 20
+vol_cap: 0.25
+long_only: false
+rebalance: daily

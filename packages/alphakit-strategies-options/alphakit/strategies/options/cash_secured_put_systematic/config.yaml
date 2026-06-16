@@ -1,0 +1,33 @@
+# Default configuration for cash_secured_put_systematic.
+#
+# Single-leg systematic 1-month 5 % OTM put write on synthetic
+# option chains. Put-side analogue of covered_call_systematic;
+# cited on Whaley 2002 (foundational, CBOE PUT index construction)
+# and Israelov & Nielsen 2014 (primary, put-call-parity
+# decomposition).
+
+strategy: cash_secured_put_systematic
+family: options
+paper_doi: "10.2469/faj.v70.n6.5"
+
+# Universe: the underlying only. The synthetic short-put leg is
+# constructed by `make_put_leg_prices` (consumes synthetic-options
+# adapter) and appended to the prices panel before invoking the
+# strategy. Standard `BenchmarkRunner` does not yet wire this up —
+# Mode 2 buy-and-hold approximation runs instead.
+universe:
+  - "SPY"
+
+underlying_symbol: "SPY"
+otm_pct: 0.05
+rebalance: monthly
+
+meta:
+  paper_doi: "10.2469/faj.v70.n6.5"
+  paper_url: "https://doi.org/10.2469/faj.v70.n6.5"
+  foundational_paper_doi: "10.3905/jod.2002.319188"
+  foundational_paper_url: "https://doi.org/10.3905/jod.2002.319188"
+  feed: "synthetic-options + yfinance"
+  data_fidelity: "Synthetic chain via Black-Scholes (ADR-005). Flat IV across strikes — no skew. Real-feed Polygon verification deferred to Phase 3."
+  bridge_integration: "Declares discrete_legs=(put_leg_symbol,). vectorbt_bridge dispatches SizeType.Amount for the put leg, SizeType.TargetPercent for the underlying. See docs/phase-2-amendments.md 2026-05-01 'bridge architecture extension for discrete-traded legs'."
+  last_validated_against_data_through: "2025-12-31"

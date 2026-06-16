@@ -1,0 +1,27 @@
+# Default configuration for breakeven_inflation_rotation.
+#
+# 2-leg rotation between TIPS and nominal Treasuries based on the
+# z-score of the log-price spread (proxy for breakeven inflation).
+# Mean-reversion in both directions: long-TIPS when breakeven is
+# depressed, short-TIPS when breakeven is elevated.
+
+strategy: breakeven_inflation_rotation
+family: rates
+paper_doi: "10.1111/jofi.12032"
+
+universe:
+  - TIP  # iShares TIPS Bond ETF
+  - IEF  # iShares 7-10Y Treasury ETF (nominal counterpart)
+
+zscore_window: 252
+entry_threshold: 1.0
+exit_threshold: 0.25
+
+rebalance: daily
+
+meta:
+  paper_doi: "10.1111/jofi.12032"
+  paper_url: "https://doi.org/10.1111/jofi.12032"
+  foundational_paper_doi: "10.2307/3585242"
+  foundational_paper_url: "https://doi.org/10.2307/3585242"
+  last_validated_against_data_through: "2025-12-31"

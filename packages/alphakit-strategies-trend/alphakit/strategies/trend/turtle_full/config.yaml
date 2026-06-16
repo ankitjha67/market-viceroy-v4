@@ -1,0 +1,18 @@
+strategy: turtle_full
+family: trend
+paper_doi: "978-0071486644"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+system_1_entry: 20
+system_1_exit: 10
+system_2_entry: 55
+system_2_exit: 20
+long_only: false
+rebalance: daily

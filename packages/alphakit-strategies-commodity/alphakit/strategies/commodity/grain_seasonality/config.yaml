@@ -1,0 +1,31 @@
+# Default configuration for grain_seasonality.
+#
+# Calendar-based seasonal trade on US grain futures. Long during
+# planting-uncertainty months, short during post-harvest months,
+# flat otherwise. Per Sørensen 2002 §III applied to corn, soybeans,
+# and wheat.
+
+strategy: grain_seasonality
+family: commodity
+paper_doi: "10.1002/fut.10017"
+
+universe:
+  - "ZC=F"     # Corn — long Apr-Jun, short Sep-Nov
+  - "ZS=F"     # Soybeans — long May-Jul, short Oct-Dec
+  - "ZW=F"     # Wheat — long Feb-Apr, short Jul-Aug
+
+# Seasonal calendar (hardcoded in strategy.py per Sørensen §III)
+# - ZC=F: long {4, 5, 6}, short {9, 10, 11}
+# - ZS=F: long {5, 6, 7}, short {10, 11, 12}
+# - ZW=F: long {2, 3, 4}, short {7, 8}
+
+# Portfolio mechanics
+long_only: false                 # both planting-long and harvest-short legs
+rebalance: monthly
+
+meta:
+  paper_doi: "10.1002/fut.10017"
+  paper_url: "https://doi.org/10.1002/fut.10017"
+  foundational_paper_doi: "10.1086/296385"
+  foundational_paper_url: "https://doi.org/10.1086/296385"
+  last_validated_against_data_through: "2025-12-31"

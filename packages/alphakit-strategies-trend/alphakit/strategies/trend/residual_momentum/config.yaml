@@ -1,0 +1,22 @@
+strategy: residual_momentum
+family: trend
+paper_doi: "10.1016/j.jempfin.2011.01.003"
+
+universe:
+  - XLK
+  - XLF
+  - XLV
+  - XLE
+  - XLI
+  - XLY
+  - XLP
+  - XLU
+  - XLB
+  - XLRE
+
+formation_months: 12
+skip_months: 1
+top_pct: 0.1
+long_only: false
+min_positions_per_side: 1
+rebalance: monthly

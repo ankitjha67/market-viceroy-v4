@@ -1,0 +1,36 @@
+# Default configuration for permanent_portfolio.
+#
+# Browne's static 25/25/25/25 allocation across equity, long bonds,
+# gold, and cash. The four legs are sized so that the portfolio holds
+# one asset class that performs well in each of the four major
+# economic regimes (prosperity, deflation, inflation, tight money /
+# recession).
+
+strategy: permanent_portfolio
+family: macro
+paper_doi: "10.2139/ssrn.3168697"
+
+universe:
+  - "SPY"   # US large-cap equity (Browne: prosperity hedge)
+  - "TLT"   # 20+ year Treasuries (Browne: deflation hedge)
+  - "GLD"   # Physical gold ETF (Browne: inflation hedge)
+  - "SHY"   # 1-3 year Treasuries (Browne: cash / tight-money hedge)
+
+# Target weights (Browne 1987 verbatim)
+target_weights:
+  equity: 0.25
+  bonds: 0.25
+  gold: 0.25
+  cash: 0.25
+
+# Portfolio mechanics
+long_only: true
+rebalance: monthly                # see paper.md "Implementation deviations"
+                                  # for the monthly-vs-annual decision
+
+meta:
+  paper_doi: "10.2139/ssrn.3168697"
+  paper_url: "https://doi.org/10.2139/ssrn.3168697"
+  foundational_isbn: "0-688-06778-6"
+  foundational_title: "Why the Best-Laid Investment Plans Usually Go Wrong"
+  last_validated_against_data_through: "2025-12-31"

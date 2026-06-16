@@ -1,0 +1,11 @@
+strategy: leveraged_etf_decay
+family: volatility
+paper_doi: "10.3905/joi.2009.18.4.043"
+universe:
+  - SPY
+  - EFA
+  - AGG
+vol_lookback: 20
+vol_threshold: 0.20
+long_only: false
+rebalance: daily

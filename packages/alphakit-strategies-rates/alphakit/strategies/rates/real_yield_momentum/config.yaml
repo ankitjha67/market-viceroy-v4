@@ -1,0 +1,26 @@
+# Default configuration for real_yield_momentum.
+#
+# 12/1 time-series momentum on TIPS real-yield-derived bond returns.
+# Same mechanic as bond_tsmom_12_1 but applied to TIPS real yields
+# rather than nominal yields.
+
+strategy: real_yield_momentum
+family: rates
+paper_doi: "10.1111/jofi.12021"
+
+universe:
+  - TIP  # iShares TIPS Bond ETF (real-yield bond proxy)
+
+lookback_months: 12
+skip_months: 1
+threshold: 0.0
+
+long_only: false
+rebalance: monthly
+
+meta:
+  paper_doi: "10.1111/jofi.12021"
+  paper_url: "https://doi.org/10.1111/jofi.12021"
+  foundational_paper_doi: "10.3386/w16892"
+  foundational_paper_url: "https://doi.org/10.3386/w16892"
+  last_validated_against_data_through: "2025-12-31"

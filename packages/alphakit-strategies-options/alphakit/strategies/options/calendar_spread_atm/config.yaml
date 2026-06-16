@@ -1,0 +1,17 @@
+strategy: calendar_spread_atm
+family: options
+paper_doi: "10.1111/j.1540-6261.2009.01493.x"
+
+universe:
+  - "SPY"
+
+underlying_symbol: "SPY"
+rebalance: monthly
+
+meta:
+  paper_doi: "10.1111/j.1540-6261.2009.01493.x"
+  paper_url: "https://doi.org/10.1111/j.1540-6261.2009.01493.x"
+  feed: "synthetic-options + yfinance"
+  data_fidelity: "Synthetic chain via Black-Scholes (ADR-005). Term structure approximated via per-DTE-bucket realized-vol mapping (rv30 vs rv60); meaningful but mild compared to real markets. Real-feed Polygon verification deferred to Phase 3."
+  bridge_integration: "2 discrete legs: short front-month ATM call + long back-month ATM call. Both close at front-month expiry."
+  last_validated_against_data_through: "2025-12-31"

@@ -1,0 +1,13 @@
+strategy: shareholder_yield
+family: value
+paper_doi: "978-0-988-67950-0"
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+lookback: 252
+long_only: false
+rebalance: monthly

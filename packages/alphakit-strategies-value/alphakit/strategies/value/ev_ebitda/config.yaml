@@ -1,0 +1,15 @@
+strategy: ev_ebitda
+family: value
+paper_doi: "10.1017/S0022109011000305"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+lookback: 756
+long_only: false
+rebalance: monthly

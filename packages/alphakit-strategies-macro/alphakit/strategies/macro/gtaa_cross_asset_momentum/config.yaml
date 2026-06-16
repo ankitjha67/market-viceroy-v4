@@ -1,0 +1,49 @@
+# Default configuration for gtaa_cross_asset_momentum.
+#
+# AMP 2013 §V applied to a cross-asset ETF panel spanning 4 super-
+# classes (equity / bonds / commodities / real estate). The 9-ETF
+# default universe is broader than Phase 1 tsmom_12_1's 6-ETF mix —
+# adds TLT (long Treasuries, duration), HYG (high-yield credit),
+# and VNQ (US REITs) — to test the cross-asset breadth that AMP §V
+# documents as the source of the strategy's Sharpe over single-
+# asset-class TSMOM.
+
+strategy: gtaa_cross_asset_momentum
+family: macro
+paper_doi: "10.1111/jofi.12021"
+
+universe:
+  # Equity (3 legs spanning US / international / EM)
+  - "SPY"   # US large-cap
+  - "EFA"   # MSCI EAFE developed international
+  - "EEM"   # MSCI emerging markets
+  # Bonds (3 legs spanning aggregate / long-duration / credit)
+  - "AGG"   # US aggregate bond index
+  - "TLT"   # 20+ year Treasuries (long duration)
+  - "HYG"   # High-yield corporate credit
+  # Commodities (2 legs spanning gold / broad)
+  - "GLD"   # Physical gold
+  - "DBC"   # Broad commodities (Invesco DB)
+  # Real estate (1 leg)
+  - "VNQ"   # US REITs (Vanguard real estate)
+
+# Signal parameters (unchanged from AMP §V)
+lookback_months: 12
+skip_months: 1
+
+# Position-sizing parameters (matches Phase 2 sibling strategies)
+vol_target_annual: 0.10
+vol_lookback_days: 63            # ~3 months of trading days
+annualization: 252
+max_leverage_per_asset: 3.0      # safety cap when realised vol → 0
+
+# Portfolio mechanics
+long_only: false
+rebalance: monthly
+
+meta:
+  paper_doi: "10.1111/jofi.12021"
+  paper_url: "https://doi.org/10.1111/jofi.12021"
+  foundational_paper_doi: "10.3905/jpm.2017.44.1.015"
+  foundational_paper_url: "https://doi.org/10.3905/jpm.2017.44.1.015"
+  last_validated_against_data_through: "2025-12-31"

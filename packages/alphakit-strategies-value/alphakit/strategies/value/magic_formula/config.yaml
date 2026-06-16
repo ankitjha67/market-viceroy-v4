@@ -1,0 +1,16 @@
+strategy: magic_formula
+family: value
+paper_doi: "978-0-471-73306-5"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+value_lookback: 756
+quality_lookback: 252
+long_only: false
+rebalance: monthly

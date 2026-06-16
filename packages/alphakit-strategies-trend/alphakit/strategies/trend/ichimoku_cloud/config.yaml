@@ -1,0 +1,18 @@
+strategy: ichimoku_cloud
+family: trend
+paper_doi: "978-0470609941"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+tenkan_window: 9
+kijun_window: 26
+senkou_b_window: 52
+cloud_projection: 26
+long_only: false
+rebalance: daily

@@ -1,0 +1,48 @@
+# Default configuration for growth_inflation_regime_rotation.
+#
+# Ilmanen-Maloney-Ross (2014) growth × inflation 4-cell macro regime
+# rotation. Two informational FRED columns (CPI index → YoY computed
+# internally; GDP growth rate used directly) drive a 4-cell regime
+# classification mapped to allocations across SPY / TLT / GLD / DBC.
+# Second strategy in the Session 2G regime-state group; inherits the
+# informational-column + publication-lag pattern from Commit 8.
+
+strategy: growth_inflation_regime_rotation
+family: macro
+paper_doi: "10.3905/jpm.2014.40.3.087"
+
+universe:
+  # Tradable ETFs (carry regime-conditional weights)
+  - "SPY"               # US large-cap equity
+  - "TLT"               # 20+ year Treasuries
+  - "GLD"               # Physical gold
+  - "DBC"               # Broad commodities (Invesco DB)
+  # Informational FRED series (carry weight = 0.0)
+  - "CPIAUCSL"          # CPI All Urban Consumers (index → YoY internally)
+  - "GDPC1"             # Real GDP level (chained $, → YoY internally; always positive)
+
+# Regime classification thresholds
+growth_threshold: 2.0       # annualised GDP growth % above which growth is "rising"
+inflation_threshold: 2.5    # CPI YoY % above which inflation is "rising"
+
+# Publication-lag shifts (CPI 1mo, GDP 1mo advance estimate)
+cpi_lag_months: 1
+gdp_lag_months: 1
+
+# 4-cell regime allocations (SPY, TLT, GLD, DBC) — IMR 2014 sensitivities
+regime_weights:
+  rising_rising:   [0.40, 0.00, 0.20, 0.40]   # overheating
+  rising_falling:  [0.60, 0.40, 0.00, 0.00]   # goldilocks
+  falling_rising:  [0.00, 0.20, 0.40, 0.40]   # stagflation
+  falling_falling: [0.15, 0.70, 0.15, 0.00]   # deflation / recession
+
+# Portfolio mechanics
+long_only: true
+rebalance: monthly
+
+meta:
+  paper_doi: "10.3905/jpm.2014.40.3.087"
+  paper_url: "https://doi.org/10.3905/jpm.2014.40.3.087"
+  cpi_series_url: "https://fred.stlouisfed.org/series/CPIAUCSL"
+  gdp_series_url: "https://fred.stlouisfed.org/series/GDPC1"
+  last_validated_against_data_through: "2025-12-31"

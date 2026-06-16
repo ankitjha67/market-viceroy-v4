@@ -1,0 +1,12 @@
+strategy: cash_secured_put_proxy
+family: volatility
+paper_doi: "10.3905/JAI.2009.11.4.043"
+universe:
+  - SPY
+  - EFA
+  - AGG
+target_vol: 0.10
+vol_lookback: 20
+max_leverage: 1.5
+long_only: false
+rebalance: daily

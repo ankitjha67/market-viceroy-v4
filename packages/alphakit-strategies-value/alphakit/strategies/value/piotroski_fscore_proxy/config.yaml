@@ -1,0 +1,14 @@
+strategy: piotroski_fscore_proxy
+family: value
+paper_doi: "10.2307/2672906"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+long_only: false
+rebalance: monthly

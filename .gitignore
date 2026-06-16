@@ -1,0 +1,124 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Testing
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+htmlcov/
+
+# Type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Docs
+site/
+docs/_build/
+
+# Data caches (never commit data)
+data/cache/
+*.parquet
+*.feather
+*.h5
+*.hdf5
+
+# Secrets — never commit. .env.example is the only tracked env file.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials.json
+
+# Logs
+*.log
+logs/
+
+# Models (use a registry instead)
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+
+# Benchmark runner test artifacts
+*.json.bak
+
+# --- Market Viceroy v4 additions ---
+
+# Node / Next.js (mv-ui)
+node_modules/
+.next/
+out/
+.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Docker local volumes (compose mounts named volumes; this guards stray bind mounts)
+.docker-data/
+
+# alphakit upstream clone (scratch; lifted into packages/ at port time)
+.alphakit-src/
+
+# Internal strategy docs — kept OUT of this public repo (local-only).
+# These contain the full product/architecture strategy; not for redistribution.
+docs/market-viceroy-v4-PRD.md
+docs/trading-platform-build-plan-v2.md
+docs/repo-audit-and-port-checklist.md
+CLAUDE.md

@@ -1,0 +1,44 @@
+# Default configuration for inflation_regime_allocation.
+#
+# Neville et al. (2021) / Erb-Harvey (2006) inflation-regime 3-cell
+# allocation. One FRED informational column (CPIAUCSL index) drives
+# the low/moderate/high CPI YoY classification computed internally.
+
+strategy: inflation_regime_allocation
+family: macro
+paper_doi: "10.2469/faj.v62.n2.4080"
+
+universe:
+  # Tradable ETFs (carry regime-conditional weights)
+  - "SPY"      # US large-cap equity (low-inflation / pro-cyclical leg)
+  - "TLT"      # 20+ year Treasuries (low-inflation / bond leg)
+  - "GLD"      # Physical gold (high-inflation hedge)
+  - "DBC"      # DB Commodity Index (high-inflation commodity leg)
+  # Informational FRED series (carries weight = 0.0, strictly positive)
+  - "CPIAUCSL" # CPI All Urban Consumers SA index (level, always > 0)
+
+# 3-cell inflation thresholds (CPI YoY, %)
+low_threshold: 2.0    # CPI YoY < 2.0% → low
+high_threshold: 4.0   # CPI YoY >= 4.0% → high; 2-4% → moderate
+
+# Publication-lag shift (~mid-month release for prior month; 1mo conservative)
+cpi_lag_months: 1
+
+# 3-cell regime allocations (SPY, TLT, GLD, DBC)
+# From Neville et al. 2021 multi-asset inflation-regime results.
+regime_weights:
+  low:      [0.60, 0.30, 0.05, 0.05]  # equity+bonds outperform in low inflation
+  moderate: [0.40, 0.20, 0.20, 0.20]  # balanced with real-asset tilt
+  high:     [0.05, 0.05, 0.45, 0.45]  # gold+commodities in high inflation
+
+# Portfolio mechanics
+long_only: true
+rebalance: monthly
+
+meta:
+  paper_doi: "10.2469/faj.v62.n2.4080"
+  paper_url: "https://doi.org/10.2469/faj.v62.n2.4080"
+  foundational_paper_doi: "10.3905/jpm.2021.1.290"
+  foundational_paper_url: "https://doi.org/10.3905/jpm.2021.1.290"
+  cpi_url: "https://fred.stlouisfed.org/series/CPIAUCSL"
+  last_validated_against_data_through: "2025-12-31"

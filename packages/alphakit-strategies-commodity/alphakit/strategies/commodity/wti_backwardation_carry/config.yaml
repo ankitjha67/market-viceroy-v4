@@ -1,0 +1,36 @@
+# Default configuration for wti_backwardation_carry.
+#
+# Long-only carry on WTI crude oil. Long the front-month contract
+# when the smoothed front-vs-next roll yield is positive
+# (backwardation); flat otherwise.
+#
+# Per Erb/Harvey 2006 §III the carry-on-commodity-futures rule
+# applied to WTI: backwardated curves earn positive excess returns
+# on long positions, contangoed curves do not. Short side is
+# deliberately omitted — see ng_contango_short for the contango
+# short trade with its own microstructure assumptions.
+
+strategy: wti_backwardation_carry
+family: commodity
+paper_doi: "10.2469/faj.v62.n2.4084"
+
+universe:
+  - "CL=F"    # Front-month WTI (traded leg)
+  - "CL2=F"   # Next-listed-month WTI (signal only, not traded)
+
+# Signal parameters
+front_symbol: "CL=F"
+next_symbol: "CL2=F"
+smoothing_days: 21               # ~1 month rolling mean of roll yield
+backwardation_threshold: 0.0     # any positive smoothed roll yield → long
+
+# Portfolio mechanics
+long_only: true                  # EH06 §III rule is long-only
+rebalance: daily                 # signal recomputed every trading day
+
+meta:
+  paper_doi: "10.2469/faj.v62.n2.4084"
+  paper_url: "https://doi.org/10.2469/faj.v62.n2.4084"
+  foundational_paper_doi: "10.2469/faj.v62.n2.4083"
+  foundational_paper_url: "https://doi.org/10.2469/faj.v62.n2.4083"
+  last_validated_against_data_through: "2025-12-31"

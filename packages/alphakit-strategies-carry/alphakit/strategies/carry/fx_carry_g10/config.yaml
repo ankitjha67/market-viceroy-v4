@@ -1,0 +1,20 @@
+strategy: fx_carry_g10
+family: carry
+paper_doi: "10.1093/rfs/hhr068"
+
+universe:
+  - AUDUSD
+  - CADUSD
+  - CHFUSD
+  - EURUSD
+  - GBPUSD
+  - JPYUSD
+  - NOKUSD
+  - NZDUSD
+  - SEKUSD
+
+lookback: 63
+n_long: 3
+n_short: 3
+long_only: false
+rebalance: monthly

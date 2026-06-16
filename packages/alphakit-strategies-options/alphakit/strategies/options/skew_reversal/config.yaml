@@ -1,0 +1,20 @@
+strategy: skew_reversal
+family: options
+paper_doi: "10.1093/rfs/hhp005"
+
+universe:
+  - "SPY"
+
+underlying_symbol: "SPY"
+entry_threshold: 1.5
+rebalance: monthly
+
+meta:
+  paper_doi: "10.1093/rfs/hhp005"
+  paper_url: "https://doi.org/10.1093/rfs/hhp005"
+  foundational_paper_doi: "10.1093/rfs/16.1.0101"
+  feed: "synthetic-options + yfinance"
+  data_fidelity: "⚠ SUBSTRATE CAVEAT — synthetic chain has flat IV; skew z-score is structurally zero; trigger NEVER fires. Strategy ships for Phase 3 real-feed verification (Polygon). See known_failures.md."
+  bridge_integration: "1 conditional discrete leg (short put when triggered). On synthetic substrate: degenerate no-trade backtest."
+  substrate_caveat: "trigger never fires — synthetic-chain backtest is uninformative"
+  last_validated_against_data_through: "2025-12-31"

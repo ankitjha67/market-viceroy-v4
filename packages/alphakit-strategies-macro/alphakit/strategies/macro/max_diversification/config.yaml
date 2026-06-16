@@ -1,0 +1,34 @@
+# Default configuration for max_diversification.
+#
+# Choueifaty-Coignard (2008) Maximum-Diversification Portfolio on
+# the same 3-asset risk-parity universe as risk_parity_erc_3asset
+# and min_variance_gtaa (SPY / TLT / DBC). Maximises the
+# diversification ratio DR(w) = (wᵀσ) / sqrt(wᵀΣw) via SciPy SLSQP
+# through the package-private _covariance helper.
+
+strategy: max_diversification
+family: macro
+paper_doi: "10.2139/ssrn.1895459"
+
+universe:
+  - "SPY"   # US large-cap equity
+  - "TLT"   # 20+ year Treasuries
+  - "DBC"   # Broad commodities (Invesco DB)
+
+# Covariance estimator (same as risk_parity_erc_3asset + min_variance_gtaa)
+cov_window_days: 252
+shrinkage: "ledoit_wolf"
+
+# Long-only constraint + per-asset weight cap
+max_weight: 1.0
+
+# Portfolio mechanics
+long_only: true
+rebalance: monthly
+
+meta:
+  paper_doi: "10.2139/ssrn.1895459"
+  paper_url: "https://doi.org/10.2139/ssrn.1895459"
+  foundational_paper_doi: "10.3905/JPM.2008.35.1.40"
+  foundational_paper_url: "https://doi.org/10.3905/JPM.2008.35.1.40"
+  last_validated_against_data_through: "2025-12-31"

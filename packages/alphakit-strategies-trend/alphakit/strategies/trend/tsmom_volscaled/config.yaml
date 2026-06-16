@@ -1,0 +1,34 @@
+# Default configuration for tsmom_volscaled.
+#
+# Matches Hurst, Ooi & Pedersen (2017) except for the portfolio-level
+# vol target (rescaled from the paper's 10% per-asset to the same 10%
+# we use for the MOP 2012 reference strategy so the two are directly
+# comparable) and the vol estimator (rolling 63-day stdev for
+# reproducibility — the paper uses EWMA).
+
+strategy: tsmom_volscaled
+family: trend
+paper_doi: "10.2139/ssrn.2993026"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+# Signal parameters
+lookback_months: 12
+skip_months: 1
+signal_scale: 1.0       # tanh input scale
+
+# Sizing parameters
+vol_target_annual: 0.10
+vol_lookback_days: 63
+annualization: 252
+max_leverage_per_asset: 3.0
+
+# Portfolio mechanics
+long_only: false
+rebalance: monthly

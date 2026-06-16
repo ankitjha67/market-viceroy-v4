@@ -1,0 +1,35 @@
+# Default configuration for risk_parity_erc_3asset.
+#
+# Equal-Risk-Contribution (Maillard-Roncalli-Teiletche 2010) on a
+# canonical 3-asset risk-parity universe: stocks (SPY), long bonds
+# (TLT), broad commodities (DBC). Each asset contributes equal
+# marginal risk to portfolio volatility at the ERC optimum.
+#
+# Rolling 252-day covariance with Ledoit-Wolf 2004 shrinkage to a
+# constant-correlation target. ERC weights solved via the convex
+# Spinu (2013) reformulation through the package-private
+# _covariance helper (alphakit.strategies.macro._covariance).
+
+strategy: risk_parity_erc_3asset
+family: macro
+paper_doi: "10.2469/faj.v68.n1.1"
+
+universe:
+  - "SPY"   # US large-cap equity (stocks leg)
+  - "TLT"   # 20+ year Treasuries (bonds leg, long duration)
+  - "DBC"   # Broad commodities (Invesco DB)
+
+# Covariance estimator parameters
+cov_window_days: 252               # 1 trading year
+shrinkage: "ledoit_wolf"           # analytic-optimal LW 2004 to constant-correlation target
+
+# Portfolio mechanics
+long_only: true
+rebalance: monthly
+
+meta:
+  paper_doi: "10.2469/faj.v68.n1.1"
+  paper_url: "https://doi.org/10.2469/faj.v68.n1.1"
+  foundational_paper_doi: "10.3905/jpm.2010.36.4.060"
+  foundational_paper_url: "https://doi.org/10.3905/jpm.2010.36.4.060"
+  last_validated_against_data_through: "2025-12-31"

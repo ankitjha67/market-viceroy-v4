@@ -1,0 +1,13 @@
+strategy: fcf_yield
+family: value
+paper_doi: "10.1111/j.1540-6261.1994.tb04772.x"
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+lookback: 756
+long_only: false
+rebalance: monthly

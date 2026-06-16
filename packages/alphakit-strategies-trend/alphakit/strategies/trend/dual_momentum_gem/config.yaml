@@ -1,0 +1,16 @@
+strategy: dual_momentum_gem
+family: trend
+paper_doi: "10.2139/ssrn.2042750"
+
+universe:
+  - SPY    # US equities
+  - VEU    # International equities ex-US
+  - AGG    # US aggregate bonds
+  - SHY    # 1-3yr Treasuries (risk-free proxy)
+
+us_equity: SPY
+intl_equity: VEU
+bonds: AGG
+risk_free: SHY
+lookback_months: 12
+rebalance: monthly

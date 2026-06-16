@@ -1,0 +1,23 @@
+# Default configuration for credit_spread_momentum.
+#
+# 6/0 momentum on investment-grade corporate bond returns. Jostova
+# et al. (2013) use 6 months as the most reliable signal horizon
+# for corporate bonds (shorter than the 12/1 used for Treasuries).
+
+strategy: credit_spread_momentum
+family: rates
+paper_doi: "10.1093/rfs/hht022"
+
+universe:
+  - LQD  # iShares iBoxx $ Investment Grade Corporate Bond ETF
+
+lookback_months: 6
+skip_months: 0
+threshold: 0.0
+
+rebalance: monthly
+
+meta:
+  paper_doi: "10.1093/rfs/hht022"
+  paper_url: "https://doi.org/10.1093/rfs/hht022"
+  last_validated_against_data_through: "2025-12-31"

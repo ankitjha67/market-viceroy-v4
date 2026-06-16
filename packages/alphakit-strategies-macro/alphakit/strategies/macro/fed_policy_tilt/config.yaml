@@ -1,0 +1,43 @@
+# Default configuration for fed_policy_tilt.
+#
+# Conover et al. (2008) / Jensen-Mercer-Johnson (1996) federal-policy-
+# tilt 2-cell regime allocation. One FRED informational column
+# (FEDFUNDS) drives the tightening/easing classification based on the
+# direction of the effective fed funds rate over the trailing
+# lookback_months period.
+
+strategy: fed_policy_tilt
+family: macro
+paper_doi: "10.1016/0304-405X(96)00875-X"
+
+universe:
+  # Tradable ETFs (carry regime-conditional weights)
+  - "SPY"       # US large-cap equity (easing / pro-cyclical leg)
+  - "TLT"       # 20+ year Treasuries (tightening / defensive bond leg)
+  - "GLD"       # Physical gold (tightening / inflation-hedge leg)
+  # Informational FRED rate series (carries weight = 0.0, strictly positive)
+  - "FEDFUNDS"  # Effective federal funds rate (%, monthly average)
+
+# Lookback for rate direction (months)
+lookback_months: 3    # compare current rate to rate 3 months ago
+
+# Publication-lag shift (FEDFUNDS published with ~2-week lag; 1mo conservative)
+fed_lag_months: 1
+
+# 2-cell regime allocations (SPY, TLT, GLD)
+# Easing is equity-positive (JMJ 1996 / Conover 2008 empirical finding)
+regime_weights:
+  easing:     [0.70, 0.20, 0.10]   # falling/flat rate → risk-on equity
+  tightening: [0.20, 0.60, 0.20]   # rising rate → defensive bonds + gold
+
+# Portfolio mechanics
+long_only: true
+rebalance: monthly
+
+meta:
+  paper_doi: "10.1016/0304-405X(96)00875-X"
+  paper_url: "https://doi.org/10.1016/0304-405X(96)00875-X"
+  foundational_paper_doi: "10.3905/joi.2008.17.4.61"
+  foundational_paper_url: "https://doi.org/10.3905/joi.2008.17.4.61"
+  fedfunds_url: "https://fred.stlouisfed.org/series/FEDFUNDS"
+  last_validated_against_data_through: "2025-12-31"

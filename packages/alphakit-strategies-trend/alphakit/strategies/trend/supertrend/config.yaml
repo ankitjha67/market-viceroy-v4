@@ -1,0 +1,16 @@
+strategy: supertrend
+family: trend
+paper_doi: "0-89459-027-8"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+atr_period: 10
+multiplier: 3.0
+long_only: false
+rebalance: daily

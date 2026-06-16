@@ -1,0 +1,58 @@
+# Default configuration for commodity_curve_carry.
+#
+# Cross-sectional curve-carry on an 8-commodity panel. Long the top
+# tercile by roll yield (most-backwardated), short the bottom
+# tercile (most-contangoed), equal-weighted within each leg,
+# dollar-neutral by construction. Per Koijen-Moskowitz-Pedersen-
+# Vrugt 2018 §IV unified-carry framework applied to commodities.
+
+strategy: commodity_curve_carry
+family: commodity
+paper_doi: "10.1016/j.jfineco.2017.11.002"
+
+universe_front:
+  - "CL=F"
+  - "NG=F"
+  - "GC=F"
+  - "SI=F"
+  - "HG=F"
+  - "ZC=F"
+  - "ZS=F"
+  - "ZW=F"
+
+universe_next:
+  - "CL2=F"
+  - "NG2=F"
+  - "GC2=F"
+  - "SI2=F"
+  - "HG2=F"
+  - "ZC2=F"
+  - "ZS2=F"
+  - "ZW2=F"
+
+front_next_map:
+  "CL=F": "CL2=F"
+  "NG=F": "NG2=F"
+  "GC=F": "GC2=F"
+  "SI=F": "SI2=F"
+  "HG=F": "HG2=F"
+  "ZC=F": "ZC2=F"
+  "ZS=F": "ZS2=F"
+  "ZW=F": "ZW2=F"
+
+# Signal parameters
+top_quantile: 0.333              # long top 1/3
+bottom_quantile: 0.333           # short bottom 1/3
+smoothing_days: 21               # ~1 month rolling mean
+min_panel_size: 4
+
+# Portfolio mechanics
+long_only: false                 # dollar-neutral long-short
+rebalance: monthly
+
+meta:
+  paper_doi: "10.1016/j.jfineco.2017.11.002"
+  paper_url: "https://doi.org/10.1016/j.jfineco.2017.11.002"
+  foundational_paper_doi: "10.2469/faj.v62.n2.4084"
+  foundational_paper_url: "https://doi.org/10.2469/faj.v62.n2.4084"
+  last_validated_against_data_through: "2025-12-31"

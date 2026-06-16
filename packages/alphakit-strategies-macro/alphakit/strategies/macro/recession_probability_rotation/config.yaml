@@ -1,0 +1,40 @@
+# Default configuration for recession_probability_rotation.
+#
+# First strategy in the Session 2G regime-state group (Commits 8-12).
+# Introduces the informational-column pattern: FRED recession-
+# probability series enters as a zero-weight input column alongside
+# the tradable ETFs. Strategy threshold-classifies the regime and
+# rotates between pro-cyclical (60/40) and defensive (TLT+GLD)
+# allocations.
+
+strategy: recession_probability_rotation
+family: macro
+paper_doi: "10.1162/003465398557320"
+
+universe:
+  # Tradable ETFs (carry regime-conditional weights)
+  - "SPY"            # US large-cap equity (pro-cyclical leg)
+  - "TLT"            # 20+ year Treasuries (defensive duration)
+  - "GLD"            # Physical gold (defensive inflation hedge)
+  # Informational FRED series (carries weight = 0.0)
+  - "RECPROUSM156N"  # Cleveland Fed recession probability (monthly)
+
+# Regime classification
+recession_threshold: 0.30   # Estrella-Mishkin 1998 canonical threshold
+lag_months: 1               # FRED publication lag for RECPROUSM156N
+
+# Allocation modes (sum to 1.0 each)
+risk_on_weights: [0.60, 0.40, 0.00]   # (SPY, TLT, GLD) — pro-cyclical 60/40
+risk_off_weights: [0.00, 0.60, 0.40]  # (SPY, TLT, GLD) — defensive
+
+# Portfolio mechanics
+long_only: true
+rebalance: monthly
+
+meta:
+  paper_doi: "10.1162/003465398557320"
+  paper_url: "https://doi.org/10.1162/003465398557320"
+  foundational_paper_url: "https://www.federalreserve.gov/pubs/feds/2006/200607/200607pap.pdf"
+  foundational_paper_note: "Wright 2006 FEDS Working Paper 2006-07 (no DOI)"
+  fred_series_url: "https://fred.stlouisfed.org/series/RECPROUSM156N"
+  last_validated_against_data_through: "2025-12-31"

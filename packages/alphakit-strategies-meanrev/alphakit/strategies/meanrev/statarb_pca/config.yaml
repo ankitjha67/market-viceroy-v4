@@ -1,0 +1,18 @@
+strategy: statarb_pca
+family: meanrev
+paper_doi: "10.1080/14697680902743953"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+n_factors: 15
+formation_period: 252
+zscore_lookback: 20
+threshold: 2.0
+long_only: false
+rebalance: daily

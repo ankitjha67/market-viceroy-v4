@@ -1,0 +1,16 @@
+strategy: gap_fill
+family: meanrev
+paper_doi: "10.1111/j.1540-6261.1992.tb04681.x"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+lookback: 20
+gap_threshold: 2.0
+long_only: false
+rebalance: daily

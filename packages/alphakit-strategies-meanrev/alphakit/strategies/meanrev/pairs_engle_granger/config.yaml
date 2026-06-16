@@ -1,0 +1,17 @@
+strategy: pairs_engle_granger
+family: meanrev
+paper_doi: "10.2307/1913236"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+formation_period: 252
+zscore_lookback: 20
+threshold: 2.0
+long_only: false
+rebalance: daily

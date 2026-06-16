@@ -1,0 +1,24 @@
+[project]
+name = "alphakit-strategies-options"
+version = "0.0.1"
+description = "AlphaKit options strategies (Phase 2 target: 15 strategies)."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+authors = [{ name = "Ankit Jha" }]
+dependencies = [
+    "alphakit-core",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "PyYAML>=6.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["alphakit"]
+# Exclude per-strategy tests from the wheel — they ship alongside the
+# source for discoverability but are not consumed by end-users.
+exclude = ["**/tests/**"]

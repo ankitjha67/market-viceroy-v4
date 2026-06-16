@@ -1,0 +1,17 @@
+strategy: rsi_reversion_2
+family: meanrev
+paper_doi: "978-0-9819239-0-0"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+period: 2
+lower_threshold: 10.0
+upper_threshold: 90.0
+long_only: false
+rebalance: daily

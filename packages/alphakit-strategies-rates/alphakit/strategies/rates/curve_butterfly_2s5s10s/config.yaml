@@ -1,0 +1,35 @@
+# Default configuration for curve_butterfly_2s5s10s.
+#
+# Three-leg DV01-weighted butterfly on the US Treasury curve. Uses a
+# log-price-spread proxy for the curvature (PC3) factor; trades
+# mean-reversion of the butterfly z-score in both directions.
+#
+# Default universe is SHY (1-3Y) / IEF (7-10Y) / TLT (20+Y) — note
+# IEF is the closest tradeable proxy to the 5Y belly when working
+# with iShares ETFs; for FRED-only environments use DGS2 / DGS5 /
+# DGS10 with the duration approximation.
+
+strategy: curve_butterfly_2s5s10s
+family: rates
+paper_doi: "10.3905/jfi.1991.692347"
+
+universe:
+  - SHY  # iShares 1-3 Year Treasury Bond ETF (short wing)
+  - IEF  # iShares 7-10 Year Treasury Bond ETF (belly proxy; closer to 8Y than 5Y — see paper.md)
+  - TLT  # iShares 20+ Year Treasury Bond ETF (long wing)
+
+zscore_window: 252
+entry_threshold: 1.0
+exit_threshold: 0.25
+short_duration: 1.95
+belly_duration: 4.5
+long_duration: 8.0
+
+rebalance: daily
+
+meta:
+  paper_doi: "10.3905/jfi.1991.692347"
+  paper_url: "https://doi.org/10.3905/jfi.1991.692347"
+  foundational_paper_doi: "10.3905/jfi.1991.692347"
+  foundational_paper_url: "https://doi.org/10.3905/jfi.1991.692347"
+  last_validated_against_data_through: "2025-12-31"

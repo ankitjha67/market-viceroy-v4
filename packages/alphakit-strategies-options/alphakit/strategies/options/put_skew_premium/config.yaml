@@ -1,0 +1,22 @@
+strategy: put_skew_premium
+family: options
+paper_doi: "10.1093/rfs/hhp005"
+
+universe:
+  - "SPY"
+
+underlying_symbol: "SPY"
+put_otm: 0.05
+call_otm: 0.05
+rebalance: monthly
+
+meta:
+  paper_doi: "10.1093/rfs/hhp005"
+  paper_url: "https://doi.org/10.1093/rfs/hhp005"
+  foundational_paper_doi: "10.1093/rfs/16.1.0101"
+  foundational_paper_url: "https://doi.org/10.1093/rfs/16.1.0101"
+  feed: "synthetic-options + yfinance"
+  data_fidelity: "⚠ SUBSTRATE CAVEAT — synthetic-options chain has FLAT IV across strikes (ADR-005). The skew premium this strategy targets does NOT exist in the synthetic substrate. Strategy ships as faithful methodology implementation; Phase 3 with Polygon required for proper evaluation. See known_failures.md for full discussion."
+  bridge_integration: "2 discrete legs: short OTM put + long OTM call (risk reversal). Underlying weight 0 (pure-options trade)."
+  substrate_caveat: "synthetic-chain Sharpe is uninformative for this strategy's target premium"
+  last_validated_against_data_through: "2025-12-31"

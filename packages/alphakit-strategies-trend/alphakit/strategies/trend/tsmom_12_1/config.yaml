@@ -1,0 +1,36 @@
+# Default configuration for tsmom_12_1.
+#
+# Matches the published rules in Moskowitz, Ooi & Pedersen (2012) except
+# for the volatility target, which is rescaled from the paper's 40%
+# per-asset target down to a portfolio-level 10% that is more aligned
+# with practitioner benchmarks.
+#
+# The 6-ETF universe is the same balanced multi-asset mix used in the
+# AlphaKit reference benchmark: US equities, developed international,
+# emerging markets, aggregate bonds, gold, and broad commodities.
+
+strategy: tsmom_12_1
+family: trend
+paper_doi: "10.1016/j.jfineco.2011.11.003"
+
+universe:
+  - SPY   # S&P 500 ETF
+  - EFA   # MSCI EAFE developed international
+  - EEM   # MSCI emerging markets
+  - AGG   # US aggregate bond index
+  - GLD   # Gold
+  - DBC   # Broad commodities
+
+# Signal parameters (unchanged from the paper)
+lookback_months: 12
+skip_months: 1
+
+# Position-sizing parameters
+vol_target_annual: 0.10
+vol_lookback_days: 63            # ~3 months of trading days
+annualization: 252
+max_leverage_per_asset: 3.0      # safety cap when realised vol → 0
+
+# Portfolio mechanics
+long_only: false
+rebalance: monthly

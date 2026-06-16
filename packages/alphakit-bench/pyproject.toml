@@ -1,0 +1,24 @@
+[project]
+name = "alphakit-bench"
+version = "0.0.1"
+description = "AlphaKit benchmark runner — strategy discovery, backtest execution, and benchmark_results.json management."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+authors = [{ name = "Ankit Jha" }]
+dependencies = [
+    "alphakit-core",
+    "alphakit-data",
+    "alphakit-bridges",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "PyYAML>=6.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["alphakit"]
+exclude = ["**/tests/**"]

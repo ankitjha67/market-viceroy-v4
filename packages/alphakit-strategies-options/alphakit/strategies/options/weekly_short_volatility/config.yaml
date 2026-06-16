@@ -1,0 +1,23 @@
+strategy: weekly_short_volatility
+family: options
+paper_doi: "10.1142/S2010139214500050"
+
+universe:
+  - "SPY"
+
+underlying_symbol: "SPY"
+put_otm: 0.05
+call_otm: 0.05
+rebalance: weekly
+
+meta:
+  paper_doi: "10.1142/S2010139214500050"
+  paper_url: "https://doi.org/10.1142/S2010139214500050"
+  foundational_paper_doi: "10.1093/rfs/hhn038"
+  foundational_paper_url: "https://doi.org/10.1093/rfs/hhn038"
+  feed: "synthetic-options + yfinance"
+  reframed_from: "weekly_theta_harvest"
+  reframe_rationale: "'Theta harvest' is practitioner terminology with no academic anchor; reframed to short-vol-at-weekly-horizon per Carr-Wu 2009 + Bondarenko 2014. See docs/phase-2-amendments.md 2026-05-01."
+  data_fidelity: "Synthetic chain via Black-Scholes (ADR-005). Flat IV across strikes — no skew. Real-feed Polygon verification deferred to Phase 3."
+  bridge_integration: "2-leg discrete dispatch (short put + short call). Underlying weight 0 (pure-options trade). Weekly cadence (4× more cycles than monthly siblings)."
+  last_validated_against_data_through: "2025-12-31"

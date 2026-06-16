@@ -1,0 +1,16 @@
+strategy: ema_cross_12_26
+family: trend
+paper_doi: "978-0131479029"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+fast_span: 12
+slow_span: 26
+long_only: false
+rebalance: daily

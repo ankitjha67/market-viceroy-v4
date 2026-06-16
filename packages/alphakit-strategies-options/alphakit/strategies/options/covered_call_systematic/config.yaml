@@ -1,0 +1,38 @@
+# Default configuration for covered_call_systematic.
+#
+# Single-leg systematic 1-month 2 % OTM call write on synthetic
+# option chains. Mirrors the BXM index construction (Whaley 2002)
+# with the 2 % OTM offset Israelov & Nielsen (2014) study.
+
+strategy: covered_call_systematic
+family: options
+paper_doi: "10.2469/faj.v70.n6.5"
+
+# Universe: the underlying only. The synthetic short-call leg is
+# constructed by `CoveredCallSystematic.make_call_leg_prices`
+# (consumes the synthetic-options adapter) and appended to the
+# `prices` panel before the strategy is invoked. The standard
+# `alphakit.bench.runner.BenchmarkRunner` does NOT yet wire this up
+# — Session 2H's runner refactor will. Until then, the standard
+# benchmark exercises only the underlying-leg path (Mode 2
+# buy-and-hold approximation; documented in `paper.md` and
+# `known_failures.md`).
+universe:
+  - "SPY"
+
+# Strategy parameters (Israelov-Nielsen 2014, BXM-aligned)
+underlying_symbol: "SPY"
+otm_pct: 0.02
+
+# Portfolio mechanics
+rebalance: monthly
+
+meta:
+  paper_doi: "10.2469/faj.v70.n6.5"
+  paper_url: "https://doi.org/10.2469/faj.v70.n6.5"
+  foundational_paper_doi: "10.3905/jod.2002.319188"
+  foundational_paper_url: "https://doi.org/10.3905/jod.2002.319188"
+  feed: "synthetic-options + yfinance"
+  data_fidelity: "Synthetic chain via Black-Scholes (ADR-005). Flat IV across strikes — no skew. Real-feed Polygon verification deferred to Phase 3."
+  bridge_integration: "Declares discrete_legs=(call_leg_symbol,). vectorbt_bridge dispatches SizeType.Amount for the call leg, SizeType.TargetPercent for the underlying. See docs/phase-2-amendments.md 2026-05-01 'bridge architecture extension for discrete-traded legs'."
+  last_validated_against_data_through: "2025-12-31"

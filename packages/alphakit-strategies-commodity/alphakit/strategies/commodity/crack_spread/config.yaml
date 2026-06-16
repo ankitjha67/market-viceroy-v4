@@ -1,0 +1,40 @@
+# Default configuration for crack_spread.
+#
+# 3-2-1 crack-spread mean-reversion trade. Long the crack (long
+# products, short crude) when the rolling z-score is < -2σ; short
+# the crack when z > +2σ; flat when |z| < 0.5σ. Per Girma-Paulson
+# 1999 risk-arbitrage framework / Geman 2005 textbook treatment.
+
+strategy: crack_spread
+family: commodity
+paper_doi: "10.1002/(SICI)1096-9934(199912)19:8<931::AID-FUT5>3.0.CO;2-L"
+
+universe:
+  - "CL=F"     # Crude oil (WTI front-month)
+  - "RB=F"     # Gasoline (RBOB front-month)
+  - "HO=F"     # Heating oil / ULSD front-month
+
+# Symbols (override if using non-default ticker names)
+crude_symbol: "CL=F"
+gasoline_symbol: "RB=F"
+heating_oil_symbol: "HO=F"
+
+# Mean-reversion parameters (Girma-Paulson §IV)
+zscore_lookback_days: 252        # ~1 year — covers 5 mean-reversion half-lives
+entry_threshold: 2.0             # 2σ to enter
+exit_threshold: 0.5              # 0.5σ to exit (hysteresis)
+
+# 3-2-1 ratio (hardcoded in strategy.py; documented here for reference)
+# - 3 barrels of crude in
+# - 2 barrels of gasoline + 1 barrel of heating oil out
+# Per-leg gross weight: 0.500 / 0.333 / 0.167 (sums to 1.0)
+
+# Portfolio mechanics
+long_only: false                 # both long-crack and short-crack legs
+rebalance: daily                 # signal recomputed every trading day
+
+meta:
+  paper_doi: "10.1002/(SICI)1096-9934(199912)19:8<931::AID-FUT5>3.0.CO;2-L"
+  paper_url: "https://doi.org/10.1002/(SICI)1096-9934(199912)19:8<931::AID-FUT5>3.0.CO;2-L"
+  foundational_book: "Geman 2005, Commodities and Commodity Derivatives, Wiley"
+  last_validated_against_data_through: "2025-12-31"

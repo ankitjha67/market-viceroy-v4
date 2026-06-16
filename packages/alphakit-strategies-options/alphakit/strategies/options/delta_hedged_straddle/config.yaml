@@ -1,0 +1,20 @@
+strategy: delta_hedged_straddle
+family: options
+paper_doi: "10.1093/rfs/hhn038"
+
+universe:
+  - "SPY"
+
+underlying_symbol: "SPY"
+rebalance: daily
+
+meta:
+  paper_doi: "10.1093/rfs/hhn038"
+  paper_url: "https://doi.org/10.1093/rfs/hhn038"
+  foundational_paper_doi: "10.1086/260062"
+  foundational_paper_url: "https://doi.org/10.1086/260062"
+  feed: "synthetic-options + yfinance"
+  data_fidelity: "Synthetic chain via Black-Scholes (ADR-005). Greeks (delta) BS-computed and used directly for the hedge ratio. Real-feed Polygon verification deferred to Phase 3."
+  bridge_integration: "2 long-option discrete legs (Amount semantics, +1 at write / -1 at close) + dynamic-hedge underlying via TargetPercent (-net_delta_t). Stateful coupling: make_legs_prices stores per-cycle metadata for generate_signals to compute daily deltas."
+  vrp_side: "long-vol counterparty to short-vol siblings; expected NEGATIVE return per Carr-Wu 2009"
+  last_validated_against_data_through: "2025-12-31"

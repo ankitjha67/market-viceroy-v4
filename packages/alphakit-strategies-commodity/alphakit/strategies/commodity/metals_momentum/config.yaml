@@ -1,0 +1,37 @@
+# Default configuration for metals_momentum.
+#
+# Metals-only 12/1 time-series momentum on a continuous-contract
+# futures panel. Same mechanic as commodity_tsmom restricted to the
+# metals subset of the Asness §V commodity panel: monetary metals
+# (gold, silver) plus industrial metals (copper, platinum).
+
+strategy: metals_momentum
+family: commodity
+paper_doi: "10.1111/jofi.12021"
+
+universe:
+  - "GC=F"   # Gold (monetary)
+  - "SI=F"   # Silver (monetary / industrial)
+  - "HG=F"   # Copper (industrial)
+  - "PL=F"   # Platinum (industrial / catalytic)
+
+# Signal parameters (unchanged from Asness §V)
+lookback_months: 12
+skip_months: 1
+
+# Position-sizing parameters
+vol_target_annual: 0.10
+vol_lookback_days: 63            # ~3 months of trading days
+annualization: 252
+max_leverage_per_asset: 3.0      # safety cap when realised vol → 0
+
+# Portfolio mechanics
+long_only: false
+rebalance: monthly
+
+meta:
+  paper_doi: "10.1111/jofi.12021"
+  paper_url: "https://doi.org/10.1111/jofi.12021"
+  foundational_paper_doi: "10.1016/j.jfineco.2011.11.003"
+  foundational_paper_url: "https://doi.org/10.1016/j.jfineco.2011.11.003"
+  last_validated_against_data_through: "2025-12-31"

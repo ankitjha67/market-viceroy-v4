@@ -1,0 +1,12 @@
+strategy: iron_condor_systematic_proxy
+family: volatility
+paper_doi: "10.2469/faj.v70.n6.3"
+universe:
+  - SPY
+  - EFA
+  - AGG
+target_vol: 0.10
+vol_lookback: 20
+max_leverage: 1.5
+long_only: false
+rebalance: daily

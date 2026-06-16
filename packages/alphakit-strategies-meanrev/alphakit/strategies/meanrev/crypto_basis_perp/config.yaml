@@ -1,0 +1,15 @@
+strategy: crypto_basis_perp
+family: meanrev
+paper_doi: "crypto-native-no-formal-doi"
+
+universe:
+  - BTC
+  - ETH
+  - SOL
+
+fast_period: 5
+slow_period: 30
+zscore_lookback: 20
+threshold: 2.0
+long_only: false
+rebalance: daily

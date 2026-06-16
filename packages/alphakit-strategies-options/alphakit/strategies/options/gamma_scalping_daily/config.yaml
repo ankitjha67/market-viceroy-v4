@@ -1,0 +1,21 @@
+strategy: gamma_scalping_daily
+family: options
+paper_doi: "ISBN:978-0470181998"
+
+universe:
+  - "SPY"
+
+underlying_symbol: "SPY"
+rebalance: daily
+
+meta:
+  paper_doi: "ISBN:978-0470181998"
+  primary_methodology: "Sinclair 2008 Volatility Trading (book, ISBN-cited)"
+  foundational_paper_doi: "10.1111/j.1540-6261.1987.tb02568.x"
+  foundational_paper_url: "https://doi.org/10.1111/j.1540-6261.1987.tb02568.x"
+  feed: "synthetic-options + yfinance"
+  data_fidelity: "Same substrate caveats as delta_hedged_straddle (composition wrapper). Greeks BS-computed, sigma frozen per cycle."
+  bridge_integration: "Composition wrapper over DeltaHedgedStraddle with Sinclair 2008 practitioner-framing metadata."
+  vrp_side: "long-vol counterparty; expected NEGATIVE return per Hull-White 1987 / Carr-Wu 2009 / Sinclair 2008 §7"
+  cluster_overlap: "ρ ≈ 0.95-1.00 with delta_hedged_straddle (same trade, different citation)"
+  last_validated_against_data_through: "2025-12-31"

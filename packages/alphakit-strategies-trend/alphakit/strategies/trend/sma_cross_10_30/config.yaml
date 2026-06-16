@@ -1,0 +1,16 @@
+strategy: sma_cross_10_30
+family: trend
+paper_doi: "10.1111/j.1540-6261.1992.tb04681.x"
+
+universe:
+  - SPY
+  - EFA
+  - EEM
+  - AGG
+  - GLD
+  - DBC
+
+fast_window: 10
+slow_window: 30
+long_only: false
+rebalance: daily

@@ -1,0 +1,31 @@
+# Default configuration for bond_carry_rolldown.
+#
+# Single-asset duration positioning conditional on the slope of the
+# US Treasury curve. Goes long the target long bond when the curve
+# is steep enough (z-score of log-price-spread < -1.0σ); flat
+# otherwise.
+#
+# This is the *time-series* version of KMPV (2018) bond carry. The
+# *cross-sectional* version lives in
+# packages/alphakit-strategies-carry/alphakit/strategies/carry/bond_carry_roll/.
+
+strategy: bond_carry_rolldown
+family: rates
+paper_doi: "10.1016/j.jfineco.2017.11.002"
+
+universe:
+  - SHY  # short-end (informational, used for slope proxy)
+  - TLT  # target long bond (the actual position)
+
+zscore_window: 252
+entry_threshold: 1.0
+exit_threshold: 0.25
+
+rebalance: daily
+
+meta:
+  paper_doi: "10.1016/j.jfineco.2017.11.002"
+  paper_url: "https://doi.org/10.1016/j.jfineco.2017.11.002"
+  foundational_paper_doi: "10.1016/0304-405X(84)90013-8"
+  foundational_paper_url: "https://doi.org/10.1016/0304-405X(84)90013-8"
+  last_validated_against_data_through: "2025-12-31"

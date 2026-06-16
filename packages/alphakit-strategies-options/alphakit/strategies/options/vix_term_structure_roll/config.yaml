@@ -1,0 +1,22 @@
+strategy: vix_term_structure_roll
+family: options
+paper_doi: "10.3905/jod.2014.21.3.054"
+
+universe:
+  - "^VIX"
+  - "VIX=F"
+
+spot_symbol: "^VIX"
+futures_symbol: "VIX=F"
+rebalance: daily
+
+meta:
+  paper_doi: "10.3905/jod.2014.21.3.054"
+  paper_url: "https://doi.org/10.3905/jod.2014.21.3.054"
+  foundational_paper_doi: "10.3905/JPM.2009.35.2.098"
+  foundational_paper_url: "https://doi.org/10.3905/JPM.2009.35.2.098"
+  feed: "yfinance (^VIX) + yfinance-futures (VIX=F)"
+  data_fidelity: "Real ^VIX index data + real VIX=F continuous front-month futures via yfinance passthrough. NO synthetic-options dependence. Real-data shape verification deferred to Session 2H benchmark-runner real-feed runs; integration tests mock yfinance responses."
+  bridge_integration: "Standard TargetPercent dispatch on VIX=F based on basis sign. ^VIX is signal-source only (not traded)."
+  differentiated_from_phase_1: "Phase 1 vix_term_structure uses RV-of-SPY proxy; this strategy uses real ^VIX/VIX=F. Cluster ρ ≈ 0.40-0.65."
+  last_validated_against_data_through: "2025-12-31"

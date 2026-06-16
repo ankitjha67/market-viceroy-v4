@@ -1,0 +1,11 @@
+strategy: swap_spread_carry
+family: carry
+paper_doi: "10.1093/rfs/hhl026"
+universe:
+  - US2Y
+  - US5Y
+  - US10Y
+  - US30Y
+lookback: 63
+long_only: false
+rebalance: monthly

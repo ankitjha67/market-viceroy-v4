@@ -1,0 +1,27 @@
+# Default configuration for iron_condor_monthly.
+#
+# 4-leg defined-risk short-volatility monthly write — Hill et al.
+# 2006 foundational + CBOE CNDR primary methodology.
+
+strategy: iron_condor_monthly
+family: options
+paper_doi: "10.3905/jod.2006.622777"
+
+universe:
+  - "SPY"
+
+underlying_symbol: "SPY"
+short_put_otm: 0.05    # 5% OTM short put
+long_put_otm: 0.10     # 10% OTM long put (protective)
+short_call_otm: 0.05   # 5% OTM short call
+long_call_otm: 0.10    # 10% OTM long call (protective)
+rebalance: monthly
+
+meta:
+  paper_doi: "10.3905/jod.2006.622777"
+  paper_url: "https://doi.org/10.3905/jod.2006.622777"
+  primary_methodology: "CBOE CNDR Iron Condor Index methodology"
+  feed: "synthetic-options + yfinance"
+  data_fidelity: "Synthetic chain via Black-Scholes (ADR-005). Flat IV across strikes — no skew. Real-feed Polygon verification deferred to Phase 3."
+  bridge_integration: "4-leg discrete dispatch: short-put, long-put, short-call, long-call all flagged in discrete_legs. Underlying weight is 0 (pure-options trade)."
+  last_validated_against_data_through: "2025-12-31"
