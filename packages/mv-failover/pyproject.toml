@@ -12,10 +12,13 @@ dependencies = [
     "polars>=1.0",
     "ccxt>=4.0",
     "clickhouse-connect>=0.7",
+    "psycopg[binary]>=3.2",
+    "redis>=5.0",
 ]
 
 [project.scripts]
 mv-smoke = "mv.failover.smoke.cli:main"
+mv-migrate = "mv.failover.migrate:main"
 
 [build-system]
 requires = ["hatchling>=1.25"]
