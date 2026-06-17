@@ -25,6 +25,7 @@ from typing import Any
 import polars as pl
 from nautilus_trader.backtest.engine import BacktestEngine
 from nautilus_trader.backtest.models import MakerTakerFeeModel
+from nautilus_trader.config import BacktestEngineConfig, LoggingConfig
 from nautilus_trader.model.currencies import USDT
 from nautilus_trader.model.data import Bar, BarType
 from nautilus_trader.model.enums import AccountType, OmsType
@@ -59,8 +60,10 @@ def make_paper_engine(
 
     A multi-currency CASH wallet (``base_currency=None``) so a crypto pair debits
     the quote currency and credits the base, with Decimal-precise balances.
+    Logging is bypassed so multiple engines can run in one process (e.g. a test
+    suite) without re-initializing NautilusTrader's global logging subsystem.
     """
-    engine = BacktestEngine()
+    engine = BacktestEngine(config=BacktestEngineConfig(logging=LoggingConfig(bypass_logging=True)))
     engine.add_venue(
         venue=Venue(venue),
         oms_type=OmsType.NETTING,

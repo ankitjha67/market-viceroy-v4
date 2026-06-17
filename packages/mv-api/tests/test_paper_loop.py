@@ -1,0 +1,109 @@
+"""US-001 integration: the full MVP paper loop over recorded bars.
+
+Offline and deterministic (no network, no Docker): governor-shaped bars ->
+strategies -> ensemble -> risk gate -> NautilusTrader paper fills -> hash-chained
+journal. Asserts journaled Buy/Sell/Hold, a paper fill, and an intact chain.
+"""
+
+from __future__ import annotations
+
+from decimal import Decimal
+
+import polars as pl
+from alphakit.strategies.trend.donchian_breakout_20 import DonchianBreakout20
+from alphakit.strategies.trend.ema_cross_12_26 import EMACross1226
+from alphakit.strategies.trend.sma_cross_10_30 import SMACross1030
+from mv.agents.baseline.runner import SignalStrategy
+from mv.api.paper_loop import run_paper_session
+from mv.failover.normalize import normalize_ohlcv
+from mv.journal.journal import Journal
+from mv.risk.engine import RiskEngine
+from mv.risk.kill_switch import KillSwitch
+from mv.risk.limits import RiskLimits
+from nautilus_trader.test_kit.providers import TestInstrumentProvider
+
+_HOUR_MS = 3_600_000
+_BASE_MS = 1_704_067_200_000
+
+
+def _rising_frame(n: int = 60) -> pl.DataFrame:
+    rows = []
+    price = 40_000.0
+    for i in range(n):
+        price *= 1.01
+        rows.append([_BASE_MS + i * _HOUR_MS, price, price * 1.003, price * 0.997, price, 50.0])
+    return normalize_ohlcv(
+        rows, venue="binance", symbol="BTC/USDT", timeframe="1h", source="ccxt:binance"
+    )
+
+
+def _strategies() -> list[SignalStrategy]:
+    return [EMACross1226(long_only=True), SMACross1030(), DonchianBreakout20()]
+
+
+def test_full_paper_loop_journals_decisions_and_fills() -> None:
+    journal = Journal()
+    risk = RiskEngine(RiskLimits.aggressive(), KillSwitch())
+    instrument = TestInstrumentProvider.btcusdt_binance()
+
+    engine = run_paper_session(
+        frame=_rising_frame(60),
+        symbol="BTC/USDT",
+        timeframe="1h",
+        strategies=_strategies(),
+        risk_engine=risk,
+        journal=journal,
+        instrument=instrument,
+        warmup=30,
+        starting_equity=Decimal("1000000"),
+    )
+    try:
+        kinds = [e.kind for e in journal.entries()]
+        decisions = [e for e in journal.entries() if e.kind == "decision"]
+        executions = [e for e in journal.entries() if e.kind == "execution"]
+
+        # A decision (and its risk assessment) per post-warmup bar.
+        assert len(decisions) >= 25
+        assert "risk_assessment" in kinds
+        # The uptrend produced at least one BUY that executed to a paper fill.
+        assert any(d.payload["action"] == "BUY" for d in decisions)
+        assert len(executions) >= 1
+        assert executions[0].payload["side"] == "BUY"
+
+        # A long position was opened on the paper venue.
+        positions = engine.cache.positions()
+        assert len(positions) == 1
+        assert positions[0].quantity.as_double() > 0.0
+
+        # The whole decision trail is tamper-evident and intact.
+        journal.verify()
+    finally:
+        engine.dispose()
+
+
+def test_kill_switch_halts_the_loop() -> None:
+    journal = Journal()
+    kill = KillSwitch()
+    kill.trip(reason="operator halt")
+    risk = RiskEngine(RiskLimits.aggressive(), kill)
+    instrument = TestInstrumentProvider.btcusdt_binance()
+
+    engine = run_paper_session(
+        frame=_rising_frame(60),
+        symbol="BTC/USDT",
+        timeframe="1h",
+        strategies=_strategies(),
+        risk_engine=risk,
+        journal=journal,
+        instrument=instrument,
+        warmup=30,
+        starting_equity=Decimal("1000000"),
+    )
+    try:
+        # Decisions are still journaled, but nothing executes while halted.
+        assert any(e.kind == "decision" for e in journal.entries())
+        assert all(e.kind != "execution" for e in journal.entries())
+        assert len(engine.cache.positions()) == 0
+        journal.verify()
+    finally:
+        engine.dispose()

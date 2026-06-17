@@ -8,7 +8,19 @@ requires-python = ">=3.12"
 authors = [{ name = "Ankit Jha" }]
 dependencies = [
     "pydantic>=2.7",
+    "fastapi>=0.110",
+    "pandas>=2.2",
+    "alphakit-bridges",
+    "mv-agents",
+    "mv-failover",
+    "mv-journal",
+    "mv-risk",
+    "nautilus_trader==1.228.0",
 ]
+
+[project.scripts]
+mv-paper = "mv.api.cli:paper_main"
+mv-kill = "mv.api.cli:kill_main"
 
 [build-system]
 requires = ["hatchling>=1.25"]
