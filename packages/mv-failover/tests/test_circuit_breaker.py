@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from mv.failover.circuit_breaker import BreakerState, CircuitBreaker
 
 

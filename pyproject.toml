@@ -244,6 +244,8 @@ module = [
     "ccxt.*",
     "clickhouse_connect",
     "clickhouse_connect.*",
+    "nautilus_trader",
+    "nautilus_trader.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"
