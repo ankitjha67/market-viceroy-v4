@@ -8,9 +8,23 @@ in-memory :class:`~mv.journal.journal.Journal` carries the unit coverage.
 
 from __future__ import annotations
 
+from datetime import timezone
 from typing import Any, Protocol, runtime_checkable
 
 from mv.journal.chain import JournalEntry, canonical_json
+
+
+def _row_to_entry(row: Any) -> JournalEntry:  # pragma: no cover - DB I/O
+    # Normalize ts to UTC so the rehashed chain matches the original hash
+    # regardless of the connection/server timezone (timestamptz round-trip).
+    return JournalEntry(
+        seq=row[0],
+        ts=row[1].astimezone(timezone.utc),
+        kind=row[2],
+        payload=row[3],
+        prev_hash=row[4],
+        hash=row[5],
+    )
 
 
 @runtime_checkable
@@ -49,17 +63,7 @@ class PostgresJournalStore:
                 "SELECT seq, ts, kind, payload, prev_hash, hash FROM journal_entry ORDER BY seq"
             )
             rows = cur.fetchall()
-        return [
-            JournalEntry(
-                seq=row[0],
-                ts=row[1],
-                kind=row[2],
-                payload=row[3],
-                prev_hash=row[4],
-                hash=row[5],
-            )
-            for row in rows
-        ]
+        return [_row_to_entry(row) for row in rows]
 
     def query(self, kind: str) -> list[JournalEntry]:  # pragma: no cover - DB I/O
         with self._conn.cursor() as cur:
@@ -69,9 +73,4 @@ class PostgresJournalStore:
                 (kind,),
             )
             rows = cur.fetchall()
-        return [
-            JournalEntry(
-                seq=row[0], ts=row[1], kind=row[2], payload=row[3], prev_hash=row[4], hash=row[5]
-            )
-            for row in rows
-        ]
+        return [_row_to_entry(row) for row in rows]

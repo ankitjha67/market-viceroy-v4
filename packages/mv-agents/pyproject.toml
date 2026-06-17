@@ -8,6 +8,8 @@ requires-python = ">=3.12"
 authors = [{ name = "Ankit Jha" }]
 dependencies = [
     "pydantic>=2.7",
+    "mv-risk",
+    "pandas>=2.2",
 ]
 
 [build-system]

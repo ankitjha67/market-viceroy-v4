@@ -9,19 +9,23 @@ The authoritative product spec (PRD, build plan v2, repo audit) and the
 engineering standards / non-negotiables are kept internal and are not
 published to this repository.
 
-## Status — Phase 0 (Foundations)
+## Status — Phase 1 (MVP: crypto-paper trading loop) complete
 
-- `uv` workspace monorepo: ported `alphakit-*` (from
-  [alphakit@659c64b](https://github.com/ankitjha67/alphakit), see
-  [docs/PROVENANCE.md](docs/PROVENANCE.md)) + net-new `mv-*` typed skeletons.
-- alphakit test suite green on Python **3.12**.
-- CI: ruff, mypy `--strict`, pytest with the **≥85% coverage** hard gate.
-- `docker compose` for ClickHouse + Postgres + Redis; secrets via `.env` /
-  vault (see [docs/SECRETS.md](docs/SECRETS.md)).
-- Thin end-to-end **data-pipe smoke** (`mv-failover`): one crypto instrument
-  via CCXT → normalized → ClickHouse → read back.
+The end-to-end MVP loop runs on crypto data, paper only:
 
-See [docs/PHASE0.md](docs/PHASE0.md) for the exit-gate evidence.
+> Failover Governor (binance→kraken→coinbase) → all strategies → equal-weight
+> ensemble → **inviolable risk gate** → NautilusTrader paper fill (fees +
+> slippage + crypto-tax modeled) → **tamper-evident hash-chained journal**.
+
+- **US-001/003/007/008** demonstrated (deterministic tests). See
+  [docs/PHASE1.md](docs/PHASE1.md) for the exit-gate evidence; Phase 0 in
+  [docs/PHASE0.md](docs/PHASE0.md).
+- Execution spine: **NautilusTrader 1.228** (paper↔live parity via its native
+  `Strategy`). Risk engine + **Operator-only kill-switch**. Failover governor
+  (circuit breakers, reconciliation, staleness, health). Hash-chained journal.
+- Gates on **3.12**: ~2477 passed, ~92.6% coverage (≥85 hard gate), mypy
+  `--strict` clean, ruff clean. CI adds ClickHouse + Postgres service
+  containers (migrations + journal round-trip + live CCXT smoke).
 
 ## Quickstart
 
@@ -35,7 +39,10 @@ uv run ruff format --check .
 
 cp .env.example .env         # set local passwords
 docker compose up -d         # ClickHouse + Postgres + Redis
+uv run mv-migrate            # apply the Postgres schema
 MV_RUN_SMOKE=1 uv run mv-smoke   # CCXT -> ClickHouse round-trip (data-pipe smoke)
+uv run mv-paper              # one live paper session (governor -> ensemble -> risk -> fills)
+uv run mv-kill "reason"      # Operator kill-switch
 ```
 
 ## Package map (uv workspace)
