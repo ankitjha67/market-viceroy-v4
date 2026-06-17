@@ -67,6 +67,14 @@ jobs:
     services:
       clickhouse:
         image: clickhouse/clickhouse-server:24.8-alpine
+        # The image disables network access for 'default' when no user/password
+        # env is set, so we provision an explicit user here. Throwaway creds for
+        # an ephemeral service container — not real secrets.
+        env:
+          CLICKHOUSE_USER: mv
+          CLICKHOUSE_PASSWORD: ci_clickhouse_pw
+          CLICKHOUSE_DB: marketviceroy
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
         ports:
           - 8123:8123
           - 9000:9000
@@ -76,11 +84,11 @@ jobs:
           --health-timeout 3s
           --health-retries 20
     env:
-      # Service-container defaults (throwaway creds; not real secrets).
+      # Match the service-container creds above (throwaway; not real secrets).
       CLICKHOUSE_HOST: localhost
       CLICKHOUSE_HTTP_PORT: "8123"
-      CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_USER: mv
+      CLICKHOUSE_PASSWORD: ci_clickhouse_pw
       CLICKHOUSE_DB: marketviceroy
       # Kraken is keyless and CI-reachable; avoids exchange geo-blocking.
       SMOKE_EXCHANGE: kraken
@@ -103,10 +111,17 @@ jobs:
       - name: Initialize ClickHouse schema
         run: |
           uv run python - <<'PY'
+          import os
           import pathlib
           import clickhouse_connect
           ddl = pathlib.Path("infra/clickhouse/init/01_bars.sql").read_text()
-          client = clickhouse_connect.get_client(host="localhost", port=8123, username="default", password="")
+          client = clickhouse_connect.get_client(
+              host=os.environ["CLICKHOUSE_HOST"],
+              port=int(os.environ["CLICKHOUSE_HTTP_PORT"]),
+              username=os.environ["CLICKHOUSE_USER"],
+              password=os.environ["CLICKHOUSE_PASSWORD"],
+              database=os.environ["CLICKHOUSE_DB"],
+          )
           for stmt in ddl.split(";"):
               if stmt.strip():
                   client.command(stmt)
