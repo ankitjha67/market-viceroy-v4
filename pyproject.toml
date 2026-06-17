@@ -40,6 +40,10 @@ dependencies = [
     "mv-postmortem",
     "mv-risk",
     "mv-api",
+    # Execution spine (Phase 1): NautilusTrader paper/live engine. Pinned to the
+    # version validated by the Step-0 spike on Windows + Python 3.12 (Rust wheel
+    # imports; paper SimulatedExchange fills with Decimal-precise money).
+    "nautilus_trader==1.228.0",
 ]
 
 [project.optional-dependencies]
@@ -240,6 +244,8 @@ module = [
     "ccxt.*",
     "clickhouse_connect",
     "clickhouse_connect.*",
+    "nautilus_trader",
+    "nautilus_trader.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"
