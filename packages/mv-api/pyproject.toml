@@ -10,6 +10,7 @@ dependencies = [
     "pydantic>=2.7",
     "fastapi>=0.110",
     "pandas>=2.2",
+    "alphakit-bench",
     "alphakit-bridges",
     "mv-agents",
     "mv-failover",

@@ -150,6 +150,8 @@ jobs:
           PY
       - name: Journal Postgres round-trip (FR-J4)
         run: uv run pytest -m integration packages/mv-journal -v
+      - name: Gate-results Postgres round-trip (FR-V3)
+        run: uv run pytest -m integration packages/alphakit-bench -v
       - name: Data-pipe smoke (CCXT -> ClickHouse)
         run: uv run pytest -m integration packages/mv-failover -v
       - name: Run the mv-smoke CLI
