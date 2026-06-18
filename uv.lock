@@ -2028,6 +2028,7 @@ name = "mv-api"
 version = "0.0.1"
 source = { editable = "packages/mv-api" }
 dependencies = [
+    { name = "alphakit-bench" },
     { name = "alphakit-bridges" },
     { name = "fastapi" },
     { name = "mv-agents" },
@@ -2041,6 +2042,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "alphakit-bench", editable = "packages/alphakit-bench" },
     { name = "alphakit-bridges", editable = "packages/alphakit-bridges" },
     { name = "fastapi", specifier = ">=0.110" },
     { name = "mv-agents", editable = "packages/mv-agents" },

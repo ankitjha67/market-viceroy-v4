@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+from mv.api.strategies import get_strategy, list_strategies
 from mv.journal.journal import Journal
 from mv.risk.kill_switch import KillSwitch
 
@@ -68,5 +69,16 @@ def create_app(state: ApiState) -> FastAPI:
     @app.get("/api/v1/positions")
     def positions() -> list[dict[str, Any]]:
         return state.positions_provider()
+
+    @app.get("/api/v1/strategies")
+    def strategies() -> list[dict[str, Any]]:
+        return list_strategies()
+
+    @app.get("/api/v1/strategies/{slug}")
+    def strategy_detail(slug: str) -> dict[str, Any]:
+        detail = get_strategy(slug)
+        if detail is None:
+            raise HTTPException(status_code=404, detail=f"unknown strategy '{slug}'")
+        return detail
 
     return app
