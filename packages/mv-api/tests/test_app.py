@@ -67,6 +67,29 @@ def test_decisions_and_positions() -> None:
     assert positions[0]["symbol"] == "BTC/USDT"
 
 
+def test_arbitrage_endpoint() -> None:
+    state = ApiState(
+        kill_switch=KillSwitch(),
+        journal=Journal(),
+        operator_token=_TOKEN,
+        arbitrage_provider=lambda: [
+            {"kind": "cross_exchange", "after_cost_edge_bps": "12", "executability": "green"},
+            {"kind": "cross_border", "after_cost_edge_bps": "200", "executability": "red"},
+        ],
+    )
+    client = TestClient(create_app(state))
+    opportunities = client.get("/api/v1/arbitrage").json()
+    assert len(opportunities) == 2
+    assert opportunities[0]["executability"] == "green"
+    # Cross-border is surfaced but flagged non-executable.
+    assert opportunities[1]["executability"] == "red"
+
+
+def test_arbitrage_empty_by_default() -> None:
+    client, _, _ = _client()
+    assert client.get("/api/v1/arbitrage").json() == []
+
+
 def test_agent_room_returns_pipeline_for_snapshot() -> None:
     kill = KillSwitch()
     journal = Journal()

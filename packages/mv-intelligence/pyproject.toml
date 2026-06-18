@@ -12,6 +12,7 @@ dependencies = [
     "numpy>=1.26",
     "requests>=2.31",
     "clickhouse-connect>=0.7",
+    "alphakit-bridges",
 ]
 
 [build-system]

@@ -42,6 +42,8 @@ class ApiState:
     mistakes_provider: Callable[[], dict[str, Any]] = field(default=dict)
     improvements_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
     replay_provider: Callable[[dict[str, Any]], dict[str, Any]] | None = None
+    # Arbitrage Monitor (Phase 6): ranked opportunities + after-cost edge + R/A/G.
+    arbitrage_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
 
 
 def create_app(state: ApiState) -> FastAPI:
@@ -129,6 +131,11 @@ def create_app(state: ApiState) -> FastAPI:
         if state.replay_provider is None:
             raise HTTPException(status_code=503, detail="replay is not configured")
         return state.replay_provider(request)
+
+    @app.get("/api/v1/arbitrage")
+    def arbitrage() -> list[dict[str, Any]]:
+        """Arbitrage opportunities + after-cost edge + R/A/G executability (US-011)."""
+        return state.arbitrage_provider()
 
     @app.get("/api/v1/positions")
     def positions() -> list[dict[str, Any]]:

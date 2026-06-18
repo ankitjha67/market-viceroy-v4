@@ -32,6 +32,15 @@ CRYPTO_PRICES = DomainKey(
     asset_class="crypto", region="global", data_type="prices", latency_tier="realtime"
 )
 
+# Phase-6 breadth domains (US equities, India equities, FX reference rates).
+US_PRICES = DomainKey(
+    asset_class="equity", region="us", data_type="prices", latency_tier="realtime"
+)
+INDIA_PRICES = DomainKey(
+    asset_class="equity", region="india", data_type="prices", latency_tier="realtime"
+)
+FX_RATES = DomainKey(asset_class="fx", region="global", data_type="rates", latency_tier="eod")
+
 
 @dataclass(frozen=True, slots=True)
 class SourceSpec:

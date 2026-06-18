@@ -2253,6 +2253,7 @@ name = "mv-intelligence"
 version = "0.0.1"
 source = { editable = "packages/mv-intelligence" }
 dependencies = [
+    { name = "alphakit-bridges" },
     { name = "clickhouse-connect" },
     { name = "numpy" },
     { name = "pandas" },
@@ -2262,6 +2263,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "alphakit-bridges", editable = "packages/alphakit-bridges" },
     { name = "clickhouse-connect", specifier = ">=0.7" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pandas", specifier = ">=2.2" },
