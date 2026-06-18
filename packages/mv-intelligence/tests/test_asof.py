@@ -62,14 +62,15 @@ def test_missing_history_is_nan() -> None:
     assert pd.isna(out.iloc[0]["pe"])
 
 
-def test_handles_mixed_instrument_dtypes() -> None:
-    # ClickHouse returns `instrument` as StringDtype; decisions use object.
-    # merge_asof rejects mismatched `by` dtypes unless we coerce (regression guard).
-    decisions = pd.DataFrame({"instrument": ["AAPL"], "ts": [_ts(10)]})  # object dtype
+def test_handles_clickhouse_dtypes() -> None:
+    # A ClickHouse read-back has `instrument` as StringDtype and `ts` as
+    # datetime64[ms]; decisions use object + datetime64[ns]. merge_asof rejects
+    # mismatched by/on dtypes unless asof_join coerces them (regression guard).
+    decisions = pd.DataFrame({"instrument": ["AAPL"], "ts": [_ts(10)]})  # object + ns
     features = pd.DataFrame(
         {
             "instrument": pd.array(["AAPL"], dtype="string"),  # StringDtype
-            "ts": [_ts(1)],
+            "ts": pd.array([_ts(1)], dtype="datetime64[ms, UTC]"),  # ms resolution
             "feature_name": ["pe"],
             "value": [10.0],
         }

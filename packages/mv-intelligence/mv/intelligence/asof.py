@@ -14,6 +14,15 @@ import pandas as pd
 
 ASOF_TS_SUFFIX = "__asof_ts"
 
+
+def _normalize_ts(series: pd.Series) -> pd.Series:
+    """Force a UTC, nanosecond datetime so merge_asof `on` keys match.
+
+    ClickHouse returns ``datetime64[ms, UTC]``; decisions are ``datetime64[ns,
+    UTC]`` — merge_asof requires identical ``on`` resolution.
+    """
+    return pd.to_datetime(series, utc=True).dt.as_unit("ns")
+
 # Long feature-frame columns.
 INSTRUMENT = "instrument"
 TS = "ts"
@@ -54,13 +63,15 @@ def asof_join(
             raise ValueError(f"features missing column {col!r}")
 
     out: pd.DataFrame = decisions.sort_values(ts_col).reset_index(drop=True)
-    # Coerce the merge `by` key to a consistent dtype: a feature frame read back
-    # from ClickHouse comes as StringDtype, decisions as object — merge_asof
-    # rejects mismatched `by` dtypes.
+    # Coerce the merge keys to consistent dtypes: a feature frame read back from
+    # ClickHouse has `instrument` as StringDtype (vs object) and `ts` as
+    # datetime64[ms] (vs ns) — merge_asof rejects mismatched `by`/`on` dtypes.
     out[instrument_col] = out[instrument_col].astype("object")
+    out[ts_col] = _normalize_ts(out[ts_col])
     for name, group in features.groupby(name_col, sort=True):
         right = group[[instrument_col, ts_col, value_col]].copy()
         right[instrument_col] = right[instrument_col].astype("object")
+        right[ts_col] = _normalize_ts(right[ts_col])
         right[f"{name}{ASOF_TS_SUFFIX}"] = right[ts_col]
         right = right.rename(columns={value_col: str(name)}).sort_values(ts_col)
         out = pd.merge_asof(
