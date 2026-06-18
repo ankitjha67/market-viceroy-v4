@@ -23,6 +23,7 @@ def _normalize_ts(series: pd.Series) -> pd.Series:
     """
     return pd.to_datetime(series, utc=True).dt.as_unit("ns")
 
+
 # Long feature-frame columns.
 INSTRUMENT = "instrument"
 TS = "ts"
