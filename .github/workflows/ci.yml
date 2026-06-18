@@ -143,7 +143,10 @@ jobs:
               database=os.environ["CLICKHOUSE_DB"],
           )
           for path in sorted(pathlib.Path("infra/clickhouse/init").glob("*.sql")):
-              for stmt in path.read_text().split(";"):
+              # Drop full-line -- comments first so a ';' inside a comment does
+              # not split a statement (inline trailing -- comments are kept).
+              lines = [l for l in path.read_text().splitlines() if not l.strip().startswith("--")]
+              for stmt in "\n".join(lines).split(";"):
                   if stmt.strip():
                       client.command(stmt)
           print("ClickHouse schema initialized (all init/*.sql)")
