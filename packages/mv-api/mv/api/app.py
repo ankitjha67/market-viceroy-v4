@@ -35,6 +35,13 @@ class ApiState:
     journal: Journal
     operator_token: str
     positions_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
+    # Post-Mortem Room providers (Phase 5). Injected so the API stays decoupled
+    # from mv-postmortem and is testable with fakes; the runner wires the real
+    # attribution / taxonomy / ledger / replay engines in.
+    attribution_provider: Callable[[str], dict[str, Any] | None] = field(default=lambda _id: None)
+    mistakes_provider: Callable[[], dict[str, Any]] = field(default=dict)
+    improvements_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
+    replay_provider: Callable[[dict[str, Any]], dict[str, Any]] | None = None
 
 
 def create_app(state: ApiState) -> FastAPI:
@@ -97,6 +104,31 @@ def create_app(state: ApiState) -> FastAPI:
         if not pipeline:
             raise HTTPException(status_code=404, detail=f"no agent records for '{snapshot_id}'")
         return {"snapshot_id": snapshot_id, "pipeline": pipeline}
+
+    @app.get("/api/v1/trades/{trade_id}/attribution")
+    def trade_attribution(trade_id: str) -> dict[str, Any]:
+        """Causal PnL decomposition for one closed trade (FR-P1)."""
+        attribution = state.attribution_provider(trade_id)
+        if attribution is None:
+            raise HTTPException(status_code=404, detail=f"no attribution for trade '{trade_id}'")
+        return attribution
+
+    @app.get("/api/v1/postmortem/mistakes")
+    def postmortem_mistakes() -> dict[str, Any]:
+        """Mistake-taxonomy trends: per-category frequency + cumulative cost (FR-P2)."""
+        return state.mistakes_provider()
+
+    @app.get("/api/v1/postmortem/improvements")
+    def postmortem_improvements() -> list[dict[str, Any]]:
+        """The improvement ledger: every adjustment + before/after metrics (FR-P4)."""
+        return state.improvements_provider()
+
+    @app.post("/api/v1/postmortem/replay")
+    def postmortem_replay(request: dict[str, Any]) -> dict[str, Any]:
+        """Counterfactual replay: re-run with one variable changed (FR-P3)."""
+        if state.replay_provider is None:
+            raise HTTPException(status_code=503, detail="replay is not configured")
+        return state.replay_provider(request)
 
     @app.get("/api/v1/positions")
     def positions() -> list[dict[str, Any]]:

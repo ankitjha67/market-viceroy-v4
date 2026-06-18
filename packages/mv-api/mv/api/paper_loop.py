@@ -144,6 +144,17 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         if event.order_side != OrderSide.BUY:
             signed = -signed
         self._position_notional += signed
+        # Enrich the fill with the references attribution needs (Phase 5, FR-P1):
+        # the intended/decision-reference price (the bar close the decision saw),
+        # the realized fees, and the execution slippage vs intended.
+        intended = self._last_price
+        commission = getattr(event, "commission", None)
+        fees = (
+            Decimal(str(commission.as_double()))
+            if commission is not None and hasattr(commission, "as_double")
+            else Decimal("0")
+        )
+        slippage_bps = float((fill_price - intended) / intended * 10000) if intended > 0 else 0.0
         self._journal.append(
             "execution",
             {
@@ -152,6 +163,10 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
                 "price": str(fill_price),
                 "qty": str(qty),
                 "notional": str(signed),
+                "intended_price": str(intended),
+                "decision_ref_price": str(intended),
+                "fees": str(fees),
+                "slippage_bps": slippage_bps,
             },
         )
 

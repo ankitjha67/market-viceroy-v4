@@ -96,3 +96,50 @@ def test_agent_room_returns_pipeline_for_snapshot() -> None:
 def test_agent_room_404_for_unknown_snapshot() -> None:
     client, _, _ = _client()
     assert client.get("/api/v1/decisions/nope/agents").status_code == 404
+
+
+def _postmortem_client() -> TestClient:
+    state = ApiState(
+        kill_switch=KillSwitch(),
+        journal=Journal(),
+        operator_token=_TOKEN,
+        attribution_provider=lambda tid: (
+            {"trade_id": tid, "net_pnl": "20", "signal": "18"} if tid == "t1" else None
+        ),
+        mistakes_provider=lambda: {"false_signal": {"count": 2, "cost": "40"}},
+        improvements_provider=lambda: [{"change_kind": "strategy_weight", "adopted": False}],
+        replay_provider=lambda req: {
+            "variable": req["variable"],
+            "actual_pnl": "100",
+            "counterfactual_pnl": "50",
+            "delta": "-50",
+        },
+    )
+    return TestClient(create_app(state))
+
+
+def test_trade_attribution_endpoint() -> None:
+    client = _postmortem_client()
+    body = client.get("/api/v1/trades/t1/attribution").json()
+    assert body["trade_id"] == "t1"
+    assert body["signal"] == "18"
+    assert client.get("/api/v1/trades/nope/attribution").status_code == 404
+
+
+def test_mistakes_and_improvements_endpoints() -> None:
+    client = _postmortem_client()
+    mistakes = client.get("/api/v1/postmortem/mistakes").json()
+    assert mistakes["false_signal"]["count"] == 2
+    improvements = client.get("/api/v1/postmortem/improvements").json()
+    assert improvements[0]["change_kind"] == "strategy_weight"
+
+
+def test_replay_endpoint_and_unconfigured() -> None:
+    client = _postmortem_client()
+    body = client.post("/api/v1/postmortem/replay", json={"variable": "size_multiplier"}).json()
+    assert body["variable"] == "size_multiplier"
+    assert body["delta"] == "-50"
+
+    # No replay provider -> 503.
+    bare = TestClient(create_app(ApiState(KillSwitch(), Journal(), _TOKEN)))
+    assert bare.post("/api/v1/postmortem/replay", json={"variable": "x"}).status_code == 503
