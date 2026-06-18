@@ -65,3 +65,34 @@ def test_decisions_and_positions() -> None:
 
     positions = client.get("/api/v1/positions").json()
     assert positions[0]["symbol"] == "BTC/USDT"
+
+
+def test_agent_room_returns_pipeline_for_snapshot() -> None:
+    kill = KillSwitch()
+    journal = Journal()
+    snap = "BTC/USDT:2026-01-01T00:00:00+00:00"
+    journal.append("analyst_view", {"snapshot_id": snap, "agent": "technical_analyst"})
+    journal.append("debate_turn", {"snapshot_id": snap, "agent": "bull_researcher"})
+    journal.append("research_verdict", {"snapshot_id": snap, "agent": "research_manager"})
+    journal.append("risk_assessment", {"snapshot_id": snap, "agent": "risk_manager"})
+    journal.append("decision", {"snapshot_id": snap, "agent": "portfolio_manager"})
+    # A record from a different decision must not leak in.
+    journal.append("analyst_view", {"snapshot_id": "other", "agent": "technical_analyst"})
+    state = ApiState(kill_switch=kill, journal=journal, operator_token=_TOKEN)
+    client = TestClient(create_app(state))
+
+    body = client.get(f"/api/v1/decisions/{snap}/agents").json()
+    assert body["snapshot_id"] == snap
+    kinds = [r["kind"] for r in body["pipeline"]]
+    assert kinds == [
+        "analyst_view",
+        "debate_turn",
+        "research_verdict",
+        "risk_assessment",
+        "decision",
+    ]
+
+
+def test_agent_room_404_for_unknown_snapshot() -> None:
+    client, _, _ = _client()
+    assert client.get("/api/v1/decisions/nope/agents").status_code == 404

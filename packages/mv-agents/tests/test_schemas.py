@@ -9,7 +9,10 @@ from typing import TypedDict
 import pytest
 from mv.agents.schemas import (
     AgentEnvelope,
+    AnalystView,
+    DebateTurn,
     ExecutionResult,
+    ResearchVerdict,
     RiskAssessment,
     TradeDecision,
 )
@@ -113,6 +116,72 @@ def test_risk_assessment_breach() -> None:
     )
     assert r.approved is False
     assert "daily_loss" in r.breached_limits
+
+
+def test_analyst_view_roundtrip() -> None:
+    v = AnalystView(
+        **_envelope_kwargs(agent="technical_analyst"),
+        stance="bullish",
+        score=0.6,
+        horizon="swing",
+        key_factors=["momentum_20", "rsi_14"],
+    )
+    assert v.stance == "bullish"
+    assert v.score == 0.6
+    restored = AnalystView.model_validate_json(v.model_dump_json())
+    assert restored == v
+
+
+def test_analyst_view_score_bounds() -> None:
+    with pytest.raises(ValidationError):
+        AnalystView(
+            **_envelope_kwargs(agent="technical_analyst"),
+            stance="bullish",
+            score=1.5,
+            horizon="swing",
+        )
+
+
+def test_analyst_view_factors_default_empty() -> None:
+    v = AnalystView(
+        **_envelope_kwargs(agent="sentiment_analyst"),
+        stance="neutral",
+        score=0.0,
+        horizon="intraday",
+    )
+    assert v.key_factors == []
+
+
+def test_debate_turn() -> None:
+    t = DebateTurn(
+        **_envelope_kwargs(agent="bull_researcher"),
+        side="bull",
+        claim="trend and breadth both positive",
+        evidence_refs=["technical_analyst", "flow_analyst"],
+    )
+    assert t.side == "bull"
+    assert "technical_analyst" in t.evidence_refs
+
+
+def test_research_verdict_strength_bounds() -> None:
+    v = ResearchVerdict(
+        **_envelope_kwargs(agent="research_manager"),
+        thesis="net long: trend dominates a weak bear case",
+        net_stance="bullish",
+        bull_strength=0.7,
+        bear_strength=0.3,
+    )
+    assert v.net_stance == "bullish"
+    restored = ResearchVerdict.model_validate_json(v.model_dump_json())
+    assert restored == v
+    with pytest.raises(ValidationError):
+        ResearchVerdict(
+            **_envelope_kwargs(agent="research_manager"),
+            thesis="t",
+            net_stance="bullish",
+            bull_strength=1.4,
+            bear_strength=0.0,
+        )
 
 
 def test_execution_result() -> None:
