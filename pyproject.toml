@@ -247,6 +247,10 @@ module = [
     "clickhouse_connect.*",
     "nautilus_trader",
     "nautilus_trader.*",
+    "langgraph",
+    "langgraph.*",
+    "langchain_core",
+    "langchain_core.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"

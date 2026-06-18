@@ -75,6 +75,53 @@ def _risk_assessment(
     )
 
 
+def gate_proposed_trade(
+    proposed: TradeDecision,
+    *,
+    symbol: str,
+    ts: datetime,
+    snapshot_id: str,
+    equity: Decimal,
+    risk_engine: RiskEngine,
+    portfolio_state: PortfolioState,
+) -> GatedDecision:
+    """Size a proposed signed-fraction decision and gate it through the risk engine.
+
+    This is the single sizing + inviolable-risk path shared by the Phase-1
+    ensemble baseline (:func:`decide`) and the Phase-4 agent graph: a proposal
+    with ``target_size`` a signed conviction fraction in ``[-1, 1]`` is sized to
+    a per-position-capped notional and checked against the risk engine. The risk
+    engine remains the inviolable gate (kill-switch, daily-loss, drawdown,
+    exposure) — no proposal can bypass it.
+    """
+    if proposed.action == "HOLD":
+        risk = RiskAssessment(
+            agent="risk_manager",
+            instrument=symbol,
+            ts=ts,
+            snapshot_id=snapshot_id,
+            confidence=1.0,
+            rationale="no order (HOLD)",
+            approved=True,
+            breached_limits=[],
+            max_size_allowed=Decimal("0"),
+            notes="no order (HOLD)",
+        )
+        return GatedDecision(proposed, risk, execute=False, side=None, notional=Decimal("0"))
+
+    side: Literal["BUY", "SELL"] = "BUY" if proposed.target_size > 0 else "SELL"
+    # Size within the per-position cap: a full-conviction proposal (|w|=1)
+    # targets exactly max_position_pct of equity.
+    target_fraction = proposed.target_size * risk_engine.limits.max_position_pct
+    notional = (target_fraction * equity).copy_abs()
+    result = risk_engine.check(ProposedTrade(symbol, side, notional), portfolio_state)
+    risk = _risk_assessment(result, instrument=symbol, ts=ts, snapshot_id=snapshot_id)
+    decision = proposed.model_copy(
+        update={"risk_ref": f"risk:{snapshot_id}", "target_size": target_fraction}
+    )
+    return GatedDecision(decision, risk, execute=result.approved, side=side, notional=notional)
+
+
 def decide(
     strategies: Sequence[SignalStrategy],
     window: pd.DataFrame,
@@ -96,31 +143,12 @@ def decide(
         snapshot_id=snapshot_id,
         hold_threshold=hold_threshold,
     )
-
-    if proposed.action == "HOLD":
-        risk = RiskAssessment(
-            agent="risk_manager",
-            instrument=symbol,
-            ts=ts,
-            snapshot_id=snapshot_id,
-            confidence=1.0,
-            rationale="no order (HOLD)",
-            approved=True,
-            breached_limits=[],
-            max_size_allowed=Decimal("0"),
-            notes="no order (HOLD)",
-        )
-        return GatedDecision(proposed, risk, execute=False, side=None, notional=Decimal("0"))
-
-    side: Literal["BUY", "SELL"] = "BUY" if proposed.target_size > 0 else "SELL"
-    # Size within the per-position cap: a full-conviction ensemble (|w|=1)
-    # targets exactly max_position_pct of equity. The risk engine remains the
-    # inviolable gate (kill-switch, daily-loss, drawdown, exposure).
-    target_fraction = proposed.target_size * risk_engine.limits.max_position_pct
-    notional = (target_fraction * equity).copy_abs()
-    result = risk_engine.check(ProposedTrade(symbol, side, notional), portfolio_state)
-    risk = _risk_assessment(result, instrument=symbol, ts=ts, snapshot_id=snapshot_id)
-    decision = proposed.model_copy(
-        update={"risk_ref": f"risk:{snapshot_id}", "target_size": target_fraction}
+    return gate_proposed_trade(
+        proposed,
+        symbol=symbol,
+        ts=ts,
+        snapshot_id=snapshot_id,
+        equity=equity,
+        risk_engine=risk_engine,
+        portfolio_state=portfolio_state,
     )
-    return GatedDecision(decision, risk, execute=result.approved, side=side, notional=notional)

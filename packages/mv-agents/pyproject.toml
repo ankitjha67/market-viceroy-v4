@@ -9,7 +9,14 @@ authors = [{ name = "Ankit Jha" }]
 dependencies = [
     "pydantic>=2.7",
     "mv-risk",
+    "mv-journal",
+    "mv-intelligence",
     "pandas>=2.2",
+    # Pinned: validated on Windows + Python 3.12 by the P4.0 spike (StateGraph
+    # fan-in + reducer + MemorySaver checkpointer; mypy --strict clean via the
+    # langgraph.* untyped-import override). Hold the pin for reproducibility.
+    "langgraph==1.2.5",
+    "requests>=2.31",
 ]
 
 [build-system]

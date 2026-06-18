@@ -81,6 +81,42 @@ def test_full_paper_loop_journals_decisions_and_fills() -> None:
         engine.dispose()
 
 
+def test_agent_graph_loop_journals_full_transcript_and_fills() -> None:
+    # US-002: the LangGraph agent pipeline drives autonomous paper execution.
+    journal = Journal()
+    risk = RiskEngine(RiskLimits.aggressive(), KillSwitch())
+    instrument = TestInstrumentProvider.btcusdt_binance()
+
+    engine = run_paper_session(
+        frame=_rising_frame(60),
+        symbol="BTC/USDT",
+        timeframe="1h",
+        strategies=_strategies(),
+        risk_engine=risk,
+        journal=journal,
+        instrument=instrument,
+        warmup=30,
+        starting_equity=Decimal("1000000"),
+        use_agents=True,
+    )
+    try:
+        kinds = [e.kind for e in journal.entries()]
+        decisions = [e for e in journal.entries() if e.kind == "decision"]
+
+        # The full debated transcript is journaled, not just the decision.
+        assert kinds.count("analyst_view") >= 25 * 7
+        assert "debate_turn" in kinds
+        assert "research_verdict" in kinds
+        assert "risk_assessment" in kinds
+        # The uptrend's strong technical ensemble produced a BUY that filled.
+        assert any(d.payload["action"] == "BUY" for d in decisions)
+        assert any(e.kind == "execution" for e in journal.entries())
+        assert len(engine.cache.positions()) == 1
+        journal.verify()
+    finally:
+        engine.dispose()
+
+
 def test_kill_switch_halts_the_loop() -> None:
     journal = Journal()
     kill = KillSwitch()

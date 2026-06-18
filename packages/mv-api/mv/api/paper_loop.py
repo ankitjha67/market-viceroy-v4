@@ -17,7 +17,14 @@ from typing import Any
 import pandas as pd
 import polars as pl
 from alphakit.bridges.nautilus_bridge import bar_type_for, bars_from_frame, make_paper_engine
-from mv.agents.baseline.runner import SignalStrategy, decide
+from mv.agents.baseline.runner import (
+    GatedDecision,
+    SignalStrategy,
+    decide,
+    strategy_signals,
+)
+from mv.agents.graph import build_agent_graph, run_decision
+from mv.agents.roster.context import AgentContext
 from mv.journal.journal import Journal
 from mv.risk.engine import PortfolioState
 from mv.risk.engine import RiskEngine as _RiskEngine
@@ -90,7 +97,19 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
             net_exposure=self._position_notional,
             positions={self._symbol: self._position_notional},
         )
-        gated = decide(
+        gated = self._decide(window, ts, snapshot_id, state)
+        self._record(gated)
+
+        if gated.execute and gated.side is not None:
+            desired = 1 if gated.side == "BUY" else -1
+            if desired != _sign(self._position_notional):
+                self._submit(gated.side, gated.notional)
+
+    def _decide(
+        self, window: pd.DataFrame, ts: datetime, snapshot_id: str, state: PortfolioState
+    ) -> GatedDecision:
+        """Produce the gated decision. The baseline ensembles all strategies."""
+        return decide(
             self._strategies,
             window,
             symbol=self._symbol,
@@ -101,13 +120,11 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
             portfolio_state=state,
             hold_threshold=self._hold_threshold,
         )
+
+    def _record(self, gated: GatedDecision) -> None:
+        """Journal the decision + risk assessment (the baseline does it here)."""
         self._journal.append("decision", gated.decision.model_dump(mode="json"))
         self._journal.append("risk_assessment", gated.risk.model_dump(mode="json"))
-
-        if gated.execute and gated.side is not None:
-            desired = 1 if gated.side == "BUY" else -1
-            if desired != _sign(self._position_notional):
-                self._submit(gated.side, gated.notional)
 
     def _submit(self, side: str, notional: Decimal) -> None:
         if self._last_price <= 0:
@@ -139,6 +156,35 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         )
 
 
+class AgentGraphStrategy(EnsembleStrategy):
+    """Phase-4 loop path: the LangGraph agent pipeline replaces the ensemble.
+
+    Same NautilusTrader plumbing as :class:`EnsembleStrategy` (window, sizing,
+    submit, fills); only the decision changes — each bar runs the agent graph
+    (Research → Analyst → Bull/Bear debate → Research Manager → Risk veto → PM),
+    which journals the **full transcript** (analyst views, debate, verdict, risk,
+    decision) itself. The Technical analyst consumes the same strategy ensemble,
+    so this is continuous with the baseline while adding the debated, glass-box
+    pipeline. The risk engine remains the inviolable gate.
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._graph = build_agent_graph(journal=self._journal, risk_engine=self._risk)
+
+    def _decide(
+        self, window: pd.DataFrame, ts: datetime, snapshot_id: str, state: PortfolioState
+    ) -> GatedDecision:
+        signals = strategy_signals(self._strategies, window, self._symbol)
+        ctx = AgentContext(instrument=self._symbol, ts=ts, snapshot_id=snapshot_id, signals=signals)
+        return run_decision(self._graph, ctx, portfolio_state=state, equity=self._equity)
+
+    def _record(self, gated: GatedDecision) -> None:
+        # The graph nodes already journaled the full transcript (analyst views,
+        # debate turns, verdict, risk assessment, decision) — no double-journal.
+        return None
+
+
 def run_paper_session(
     *,
     frame: pl.DataFrame,
@@ -151,12 +197,20 @@ def run_paper_session(
     warmup: int = 30,
     starting_equity: Decimal = Decimal("1000000"),
     hold_threshold: Decimal = Decimal("0.05"),
+    use_agents: bool = False,
 ) -> Any:
-    """Run one paper session over ``frame`` and return the engine (for inspection)."""
+    """Run one paper session over ``frame`` and return the engine (for inspection).
+
+    ``use_agents`` selects the decision path: the Phase-1 deterministic ensemble
+    (default) or the Phase-4 LangGraph agent pipeline. Both run the same
+    strategies, sizing, and inviolable risk gate; the agent path adds the
+    journaled debate transcript.
+    """
     engine = make_paper_engine(venue=instrument.id.venue.value)
     engine.add_instrument(instrument)
     bar_type = bar_type_for(instrument.id, timeframe)
-    strategy = EnsembleStrategy(
+    strategy_cls = AgentGraphStrategy if use_agents else EnsembleStrategy
+    strategy = strategy_cls(
         instrument=instrument,
         bar_type=bar_type,
         strategies=strategies,

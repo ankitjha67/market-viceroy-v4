@@ -17,6 +17,15 @@ from mv.api.strategies import get_strategy, list_strategies
 from mv.journal.journal import Journal
 from mv.risk.kill_switch import KillSwitch
 
+# The agent-pipeline record kinds the graph journals, in §5 pipeline order.
+_AGENT_RECORD_KINDS = (
+    "analyst_view",
+    "debate_turn",
+    "research_verdict",
+    "risk_assessment",
+    "decision",
+)
+
 
 @dataclass
 class ApiState:
@@ -65,6 +74,29 @@ def create_app(state: ApiState) -> FastAPI:
             for entry in state.journal.entries()
             if entry.kind == "decision"
         ]
+
+    # ``:path`` so instrument-bearing snapshot ids (e.g. "BTC/USDT:<ts>") match.
+    @app.get("/api/v1/decisions/{snapshot_id:path}/agents")
+    def decision_agents(snapshot_id: str) -> dict[str, Any]:
+        """The Agent Room: the full journaled pipeline for one decision.
+
+        Returns every agent record sharing ``snapshot_id`` in pipeline order
+        (analyst views -> debate turns -> research verdict -> risk assessment ->
+        PM decision) — the "fund in a glass box" the UI renders (Phase 8).
+        """
+        pipeline = [
+            {
+                "seq": entry.seq,
+                "kind": entry.kind,
+                "ts": entry.ts.isoformat(),
+                "payload": entry.payload,
+            }
+            for entry in state.journal.entries()
+            if entry.kind in _AGENT_RECORD_KINDS and entry.payload.get("snapshot_id") == snapshot_id
+        ]
+        if not pipeline:
+            raise HTTPException(status_code=404, detail=f"no agent records for '{snapshot_id}'")
+        return {"snapshot_id": snapshot_id, "pipeline": pipeline}
 
     @app.get("/api/v1/positions")
     def positions() -> list[dict[str, Any]]:
