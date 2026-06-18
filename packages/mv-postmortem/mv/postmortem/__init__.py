@@ -1,12 +1,49 @@
-"""mv-postmortem — Attribution, mistake taxonomy, counterfactual replay, improvement ledger, and governed meta-learning.
+"""mv-postmortem — Post-Mortem & Learning Engine (PRD §4.7, FR-P1–P5).
 
-Phase: Phase 5. This is a Phase-0 typed skeleton: package boundary, version,
-and `py.typed` marker only. No behaviour is implemented here yet; the
-responsibility above is built in its owning phase, behind the contracts in
-`alphakit-core`. Labeled stub — not a passed-off implementation.
+The causal post-mortem surface: attribution (decompose realized PnL into
+signal/timing/sizing/slippage/fees/regime), the mistake taxonomy, counterfactual
+replay, the improvement ledger, and **governed, propose-only** meta-learning.
+See :mod:`.decompose`, :mod:`.mistakes`, :mod:`.replay`, :mod:`.improvement`,
+:mod:`.metalearn`.
 """
 
 from __future__ import annotations
 
+from mv.postmortem.attribution import TradeAttribution, attribute
+from mv.postmortem.decompose import components_sum, decompose
+from mv.postmortem.improvement import (
+    ImprovementEntry,
+    ImprovementLedger,
+    ImprovementStore,
+)
+from mv.postmortem.metalearn import WeightProposal, propose_weights
+from mv.postmortem.mistakes import Mistake, MistakeContext, classify, mistake_stats
+from mv.postmortem.replay import CounterfactualResult, ReplayVariable, realized_pnl, replay
+from mv.postmortem.trades import ClosedTrade, Fill, fill_from_journal, reconstruct_closed_trades
+
 __version__: str = "0.0.1"
-__all__: list[str] = ["__version__"]
+
+__all__ = [
+    "ClosedTrade",
+    "CounterfactualResult",
+    "Fill",
+    "ImprovementEntry",
+    "ImprovementLedger",
+    "ImprovementStore",
+    "Mistake",
+    "MistakeContext",
+    "ReplayVariable",
+    "TradeAttribution",
+    "WeightProposal",
+    "__version__",
+    "attribute",
+    "classify",
+    "components_sum",
+    "decompose",
+    "fill_from_journal",
+    "mistake_stats",
+    "propose_weights",
+    "realized_pnl",
+    "reconstruct_closed_trades",
+    "replay",
+]
