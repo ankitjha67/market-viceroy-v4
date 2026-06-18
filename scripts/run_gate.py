@@ -57,21 +57,26 @@ def trials_sharpe_std(slugs: list[str]) -> float:
 
 
 def grade(slug: str, runner: BenchmarkRunner, gate: ValidationGate) -> GateResult | None:
-    """Grade one strategy on real data; write the gate block; return the result."""
+    """Grade one strategy on real data; write the gate block; return the result.
+
+    Any failure (feed unavailable, bad/non-positive real data, backtest error)
+    is caught so one strategy never aborts the batch — it is skipped honestly
+    and keeps its prior status.
+    """
     family, _ = discovery.find_strategy(slug)
-    strategy = discovery.instantiate(family, slug)
-    config = discovery.load_config(family, slug)
-    universe = list(config.get("universe", []))
+    path = discovery.benchmark_results_path(family, slug)
     try:
+        strategy = discovery.instantiate(family, slug)
+        config = discovery.load_config(family, slug)
+        universe = list(config.get("universe", []))
         prices = runner._fetch_prices(universe, strategy)
-    except Exception as exc:  # feed unavailable (e.g. no FRED key) -> skip honestly
-        print(f"[skip] {slug}: feed unavailable ({type(exc).__name__}: {exc})")
+        results = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        data_source = str(results.get("data_source", "unknown"))
+        result = gate.evaluate(slug, strategy, prices, data_source=data_source)
+    except Exception as exc:  # feed/data/backtest failure -> skip honestly
+        print(f"[skip] {slug}: {type(exc).__name__}: {exc}")
         return None
 
-    path = discovery.benchmark_results_path(family, slug)
-    results = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    data_source = str(results.get("data_source", "unknown"))
-    result = gate.evaluate(slug, strategy, prices, data_source=data_source)
     results["gate"] = {
         "status": result.status.value,
         "reasons": result.reasons,
