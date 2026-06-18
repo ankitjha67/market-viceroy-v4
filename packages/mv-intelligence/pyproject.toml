@@ -8,6 +8,10 @@ requires-python = ">=3.12"
 authors = [{ name = "Ankit Jha" }]
 dependencies = [
     "pydantic>=2.7",
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "requests>=2.31",
+    "clickhouse-connect>=0.7",
 ]
 
 [build-system]

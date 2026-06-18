@@ -135,7 +135,6 @@ jobs:
           import os
           import pathlib
           import clickhouse_connect
-          ddl = pathlib.Path("infra/clickhouse/init/01_bars.sql").read_text()
           client = clickhouse_connect.get_client(
               host=os.environ["CLICKHOUSE_HOST"],
               port=int(os.environ["CLICKHOUSE_HTTP_PORT"]),
@@ -143,11 +142,17 @@ jobs:
               password=os.environ["CLICKHOUSE_PASSWORD"],
               database=os.environ["CLICKHOUSE_DB"],
           )
-          for stmt in ddl.split(";"):
-              if stmt.strip():
-                  client.command(stmt)
-          print("ClickHouse schema initialized")
+          for path in sorted(pathlib.Path("infra/clickhouse/init").glob("*.sql")):
+              # Drop full-line -- comments first so a ';' inside a comment does
+              # not split a statement (inline trailing -- comments are kept).
+              lines = [l for l in path.read_text().splitlines() if not l.strip().startswith("--")]
+              for stmt in "\n".join(lines).split(";"):
+                  if stmt.strip():
+                      client.command(stmt)
+          print("ClickHouse schema initialized (all init/*.sql)")
           PY
+      - name: Feature store round-trip (FR-I2)
+        run: uv run pytest -m integration packages/mv-intelligence -v
       - name: Journal Postgres round-trip (FR-J4)
         run: uv run pytest -m integration packages/mv-journal -v
       - name: Gate-results Postgres round-trip (FR-V3)
