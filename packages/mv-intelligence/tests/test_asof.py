@@ -62,6 +62,22 @@ def test_missing_history_is_nan() -> None:
     assert pd.isna(out.iloc[0]["pe"])
 
 
+def test_handles_mixed_instrument_dtypes() -> None:
+    # ClickHouse returns `instrument` as StringDtype; decisions use object.
+    # merge_asof rejects mismatched `by` dtypes unless we coerce (regression guard).
+    decisions = pd.DataFrame({"instrument": ["AAPL"], "ts": [_ts(10)]})  # object dtype
+    features = pd.DataFrame(
+        {
+            "instrument": pd.array(["AAPL"], dtype="string"),  # StringDtype
+            "ts": [_ts(1)],
+            "feature_name": ["pe"],
+            "value": [10.0],
+        }
+    )
+    out = asof_join(decisions, features)
+    assert out.iloc[0]["pe"] == 10.0
+
+
 def test_rejects_missing_columns() -> None:
     with pytest.raises(ValueError, match="decisions missing"):
         asof_join(pd.DataFrame({"ts": [_ts(1)]}), _features())

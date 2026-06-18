@@ -54,8 +54,13 @@ def asof_join(
             raise ValueError(f"features missing column {col!r}")
 
     out: pd.DataFrame = decisions.sort_values(ts_col).reset_index(drop=True)
+    # Coerce the merge `by` key to a consistent dtype: a feature frame read back
+    # from ClickHouse comes as StringDtype, decisions as object — merge_asof
+    # rejects mismatched `by` dtypes.
+    out[instrument_col] = out[instrument_col].astype("object")
     for name, group in features.groupby(name_col, sort=True):
         right = group[[instrument_col, ts_col, value_col]].copy()
+        right[instrument_col] = right[instrument_col].astype("object")
         right[f"{name}{ASOF_TS_SUFFIX}"] = right[ts_col]
         right = right.rename(columns={value_col: str(name)}).sort_values(ts_col)
         out = pd.merge_asof(
