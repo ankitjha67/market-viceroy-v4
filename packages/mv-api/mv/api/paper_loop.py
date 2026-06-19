@@ -28,6 +28,7 @@ from mv.agents.roster.context import AgentContext
 from mv.journal.journal import Journal
 from mv.risk.engine import PortfolioState
 from mv.risk.engine import RiskEngine as _RiskEngine
+from mv.risk.live_guard import LiveGuardConfig, gate_live_order
 from nautilus_trader.model.enums import OrderSide
 from nautilus_trader.trading.strategy import Strategy
 
@@ -59,6 +60,7 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         warmup: int,
         starting_equity: Decimal,
         hold_threshold: Decimal = Decimal("0.05"),
+        live_guard: LiveGuardConfig | None = None,
     ) -> None:
         super().__init__()
         self._instrument = instrument
@@ -70,6 +72,8 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         self._warmup = warmup
         self._equity = starting_equity
         self._hold_threshold = hold_threshold
+        # None = pure paper (unchanged). A live config enforces BR-005 + the cap.
+        self._live_guard = live_guard
         self._closes: list[float] = []
         self._times: list[datetime] = []
         self._position_notional = Decimal("0")
@@ -103,7 +107,22 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         if gated.execute and gated.side is not None:
             desired = 1 if gated.side == "BUY" else -1
             if desired != _sign(self._position_notional):
-                self._submit(gated.side, gated.notional)
+                notional = gated.notional
+                if self._live_guard is not None:
+                    decision = gate_live_order(
+                        self._live_guard,
+                        key=self._symbol,
+                        notional=notional,
+                        equity=self._equity,
+                    )
+                    if not decision.allowed:
+                        # BR-005: ungraduated -> no live order, journaled.
+                        self._journal.append(
+                            "live_blocked", {"symbol": self._symbol, "reason": decision.reason}
+                        )
+                        return
+                    notional = decision.notional.copy_abs()
+                self._submit(gated.side, notional)
 
     def _decide(
         self, window: pd.DataFrame, ts: datetime, snapshot_id: str, state: PortfolioState
@@ -213,13 +232,17 @@ def run_paper_session(
     starting_equity: Decimal = Decimal("1000000"),
     hold_threshold: Decimal = Decimal("0.05"),
     use_agents: bool = False,
+    live_guard: LiveGuardConfig | None = None,
 ) -> Any:
     """Run one paper session over ``frame`` and return the engine (for inspection).
 
     ``use_agents`` selects the decision path: the Phase-1 deterministic ensemble
     (default) or the Phase-4 LangGraph agent pipeline. Both run the same
     strategies, sizing, and inviolable risk gate; the agent path adds the
-    journaled debate transcript.
+    journaled debate transcript. ``live_guard`` (Phase 7) is ``None`` for pure
+    paper; a live config enforces BR-005 (only graduated strategies trade) + the
+    capital cap. The order path is identical paper↔live (FR-X1); only the venue
+    clients differ for real go-live (the Operator's funded action).
     """
     engine = make_paper_engine(venue=instrument.id.venue.value)
     engine.add_instrument(instrument)
@@ -235,6 +258,7 @@ def run_paper_session(
         warmup=warmup,
         starting_equity=starting_equity,
         hold_threshold=hold_threshold,
+        live_guard=live_guard,
     )
     engine.add_data(bars_from_frame(frame, bar_type, instrument))
     engine.add_strategy(strategy)
