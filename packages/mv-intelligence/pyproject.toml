@@ -13,6 +13,17 @@ dependencies = [
     "requests>=2.31",
     "clickhouse-connect>=0.7",
     "alphakit-bridges",
+    "scikit-learn>=1.4",
+    "mlflow>=2.12",
+]
+
+# Deep forecasters (FinBERT / LSTM) are an optional, offline extra — torch is
+# heavy and non-deterministic, so it stays OUT of the per-push CI gate. The
+# GBM forecaster (sklearn) is the deterministic CI default + fallback.
+[project.optional-dependencies]
+forecasting-deep = [
+    "torch>=2.2",
+    "transformers>=4.40",
 ]
 
 [build-system]
