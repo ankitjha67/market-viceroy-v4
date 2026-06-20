@@ -2772,10 +2772,12 @@ dependencies = [
     { name = "mv-agents" },
     { name = "mv-failover" },
     { name = "mv-journal" },
+    { name = "mv-postmortem" },
     { name = "mv-risk" },
     { name = "nautilus-trader" },
     { name = "pandas" },
     { name = "pydantic" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
@@ -2786,10 +2788,12 @@ requires-dist = [
     { name = "mv-agents", editable = "packages/mv-agents" },
     { name = "mv-failover", editable = "packages/mv-failover" },
     { name = "mv-journal", editable = "packages/mv-journal" },
+    { name = "mv-postmortem", editable = "packages/mv-postmortem" },
     { name = "mv-risk", editable = "packages/mv-risk" },
     { name = "nautilus-trader", specifier = "==1.228.0" },
     { name = "pandas", specifier = ">=2.2" },
     { name = "pydantic", specifier = ">=2.7" },
+    { name = "uvicorn", specifier = ">=0.30" },
 ]
 
 [[package]]
