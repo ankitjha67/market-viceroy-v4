@@ -90,6 +90,34 @@ def test_arbitrage_empty_by_default() -> None:
     assert client.get("/api/v1/arbitrage").json() == []
 
 
+def test_portfolio_and_source_health_endpoints() -> None:
+    state = ApiState(
+        kill_switch=KillSwitch(),
+        journal=Journal(),
+        operator_token=_TOKEN,
+        portfolio_provider=lambda: {
+            "equity": "1000000",
+            "day_pnl": "1250.50",
+            "drawdown": "0.02",
+            "peak_equity": "1010000",
+        },
+        source_health_provider=lambda: [
+            {"source": "ccxt:binance", "domain": "crypto.prices", "status": "green"}
+        ],
+    )
+    client = TestClient(create_app(state))
+    portfolio = client.get("/api/v1/portfolio").json()
+    assert portfolio["equity"] == "1000000"
+    sources = client.get("/api/v1/health/sources").json()
+    assert sources[0]["status"] == "green"
+
+
+def test_portfolio_empty_by_default() -> None:
+    client, _, _ = _client()
+    assert client.get("/api/v1/portfolio").json() == {}
+    assert client.get("/api/v1/health/sources").json() == []
+
+
 def _graduation_client(handler: object) -> tuple[TestClient, Journal]:
     journal = Journal()
     state = ApiState(

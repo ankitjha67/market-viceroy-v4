@@ -47,6 +47,9 @@ class ApiState:
     # Graduation (Phase 7): live status per strategy + the Operator-signed handler.
     live_status_provider: Callable[[str], str | None] = field(default=lambda _slug: None)
     graduate_handler: Callable[[str, str], dict[str, Any]] | None = None
+    # Command Deck (Phase 8): portfolio summary + per-source health.
+    portfolio_provider: Callable[[], dict[str, Any]] = field(default=dict)
+    source_health_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
 
 
 def create_app(state: ApiState) -> FastAPI:
@@ -139,6 +142,16 @@ def create_app(state: ApiState) -> FastAPI:
     def arbitrage() -> list[dict[str, Any]]:
         """Arbitrage opportunities + after-cost edge + R/A/G executability (US-011)."""
         return state.arbitrage_provider()
+
+    @app.get("/api/v1/portfolio")
+    def portfolio() -> dict[str, Any]:
+        """Command Deck summary: equity, day P&L, drawdown, peak (Phase 8)."""
+        return state.portfolio_provider()
+
+    @app.get("/api/v1/health/sources")
+    def source_health() -> list[dict[str, Any]]:
+        """Per-source health: status / quota burn / latency / failover / reconcile."""
+        return state.source_health_provider()
 
     @app.get("/api/v1/positions")
     def positions() -> list[dict[str, Any]]:
