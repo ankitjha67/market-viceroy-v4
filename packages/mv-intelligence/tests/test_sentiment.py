@@ -40,6 +40,20 @@ def test_parse_rss() -> None:
     assert items[0].published == pd.Timestamp("2024-01-15 13:00:00", tz="UTC").to_pydatetime()
 
 
+def test_parse_atom_namespaced_feed() -> None:
+    # A namespaced Atom feed must not be silently dropped (ISO-8601 timestamps).
+    atom = (
+        '<feed xmlns="http://www.w3.org/2005/Atom">'
+        "<entry><title>Strong earnings beat</title>"
+        "<published>2024-02-01T09:30:00Z</published></entry>"
+        "</feed>"
+    )
+    items = parse_rss(atom)
+    assert len(items) == 1
+    assert "Strong earnings beat" in items[0].title
+    assert items[0].published == pd.Timestamp("2024-02-01 09:30:00", tz="UTC").to_pydatetime()
+
+
 def test_score_news_to_features_point_in_time() -> None:
     items = parse_rss(_RSS)
     out = score_news(items, instrument="AAPL")

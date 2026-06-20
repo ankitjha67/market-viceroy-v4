@@ -1,7 +1,7 @@
 [project]
 name = "mv-intelligence"
 version = "0.0.1"
-description = "Point-in-time intelligence features: fundamentals, valuation, technicals, NLP/sentiment, forecasting (as-of joins; no look-ahead)."
+description = "Point-in-time intelligence: feature store (as-of joins, leakage check), fundamentals, sentiment, indicators, FRED no-train guardrail, forecasting (GBM + optional FinBERT/LSTM), MLflow tracking."
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.12"

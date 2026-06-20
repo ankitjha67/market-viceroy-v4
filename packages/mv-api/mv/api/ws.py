@@ -31,7 +31,13 @@ class BroadcastHub:
         self._subscribers.discard(queue)
 
     def publish(self, kind: str, payload: dict[str, Any]) -> None:
-        """Fan ``{kind, payload}`` out to every subscriber (drops on a full queue)."""
+        """Fan ``{kind, payload}`` out to every subscriber (drops on a full queue).
+
+        ``asyncio.Queue`` is not thread-safe: call this on the API event-loop
+        thread. A producer running on another thread (e.g. the NautilusTrader
+        loop) must marshal across with
+        ``loop.call_soon_threadsafe(hub.publish, kind, payload)``.
+        """
         event = {"kind": kind, "payload": payload}
         for queue in list(self._subscribers):
             # A slow consumer must not block (or crash) the loop — drop on full.

@@ -32,22 +32,49 @@ class NewsItem:
 def _parse_published(raw: str | None) -> datetime:
     if not raw:
         return datetime.now(timezone.utc)  # pragma: no cover - defensive
-    parsed = parsedate_to_datetime(raw)
+    raw = raw.strip()
+    try:
+        parsed: datetime | None = parsedate_to_datetime(raw)  # RFC-822 (RSS pubDate)
+    except (TypeError, ValueError):
+        parsed = None
+    if parsed is None:
+        try:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))  # ISO-8601 (Atom)
+        except ValueError:
+            return datetime.now(timezone.utc)  # pragma: no cover - unparseable date
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
 
 
+def _local(tag: str) -> str:
+    """The local element name, dropping any ``{namespace}`` prefix."""
+    return tag.rsplit("}", 1)[-1]
+
+
 def parse_rss(xml_text: str) -> list[NewsItem]:
-    """Parse RSS XML into ``NewsItem``s (title + publish time)."""
+    """Parse RSS or Atom XML into ``NewsItem``s (title + publish time).
+
+    Namespace-tolerant: matches ``<item>`` (RSS) and ``<entry>`` (Atom) and their
+    ``<title>`` / ``<pubDate>`` / ``<published>`` / ``<updated>`` children by local
+    name, so namespaced or Atom feeds are not silently dropped.
+    """
     root = ElementTree.fromstring(xml_text)
     items: list[NewsItem] = []
-    for item in root.iter("item"):
-        title_el = item.find("title")
-        if title_el is None or not title_el.text:
+    for element in root.iter():
+        if _local(element.tag) not in ("item", "entry"):
             continue
-        published = _parse_published(item.findtext("pubDate"))
-        items.append(NewsItem(title=title_el.text.strip(), published=published))
+        title: str | None = None
+        published_raw: str | None = None
+        for child in element:
+            name = _local(child.tag)
+            if name == "title" and child.text:
+                title = child.text.strip()
+            elif name.lower() in ("pubdate", "published", "updated") and published_raw is None:
+                published_raw = child.text
+        if not title:
+            continue
+        items.append(NewsItem(title=title, published=_parse_published(published_raw)))
     return items
 
 

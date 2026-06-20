@@ -90,15 +90,21 @@ class RiskEngine:
 
         breaches: list[str] = []
 
-        # Account-level breakers.
+        # Account-level breakers. A non-positive day-start / peak equity means the
+        # account is already blown — exactly when these inviolable breakers must
+        # bite — so treat it as an automatic breach rather than skipping the check.
         if state.day_start_equity > 0:
             day_pnl = state.equity - state.day_start_equity
             if day_pnl <= -(limits.daily_loss_limit_pct * state.day_start_equity):
                 breaches.append("daily_loss")
+        else:
+            breaches.append("daily_loss")
         if state.peak_equity > 0:
             drawdown = (state.peak_equity - state.equity) / state.peak_equity
             if drawdown >= limits.max_drawdown_pct:
                 breaches.append("max_drawdown")
+        else:
+            breaches.append("max_drawdown")
 
         # Per-position caps.
         position_cap = limits.max_position_pct * equity

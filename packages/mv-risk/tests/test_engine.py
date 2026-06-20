@@ -48,6 +48,16 @@ def test_approves_within_limits() -> None:
     assert result.max_size_allowed == Decimal("20000.00")
 
 
+def test_blown_account_breaks_the_account_level_breakers() -> None:
+    # A non-positive day-start / peak equity (a blown account) must trip the
+    # inviolable breakers, not silently skip them.
+    engine, _ = _engine()
+    result = engine.check(_buy("1"), _state(equity="0", peak="0", day_start="0"))
+    assert result.approved is False
+    assert "daily_loss" in result.breached_limits
+    assert "max_drawdown" in result.breached_limits
+
+
 def test_max_position_veto_emits_event() -> None:
     events: list[object] = []
     engine, _ = _engine(events.append)

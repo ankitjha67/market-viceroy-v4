@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 
+import pytest
 from fastapi.testclient import TestClient
 from mv.api.app import ApiState, create_app
 from mv.api.ws import BroadcastHub
@@ -32,11 +33,23 @@ def test_hub_drops_on_full_queue_without_raising() -> None:
     assert q.maxsize == 256
 
 
+def test_websocket_rejects_without_token() -> None:
+    from starlette.websockets import WebSocketDisconnect as WSDisconnect
+
+    hub = BroadcastHub()
+    state = ApiState(kill_switch=KillSwitch(), journal=Journal(), operator_token="t", hub=hub)
+    client = TestClient(create_app(state))
+    # No / wrong token -> the server closes the socket before accepting (1008).
+    with pytest.raises(WSDisconnect), client.websocket_connect("/ws/stream?token=wrong") as ws:
+        ws.receive_json()
+    assert hub.subscriber_count == 0
+
+
 def test_websocket_stream_delivers_published_events() -> None:
     hub = BroadcastHub()
     state = ApiState(kill_switch=KillSwitch(), journal=Journal(), operator_token="t", hub=hub)
     client = TestClient(create_app(state))
-    with client.websocket_connect("/ws/stream") as ws:
+    with client.websocket_connect("/ws/stream?token=t") as ws:
         # Wait for the server handler to subscribe, then publish.
         for _ in range(200):
             if hub.subscriber_count > 0:

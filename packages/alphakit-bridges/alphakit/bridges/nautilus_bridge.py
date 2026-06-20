@@ -18,7 +18,7 @@ objects are typed ``Any`` here (as the other bridges treat their engines).
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -93,6 +93,10 @@ def bars_from_frame(frame: pl.DataFrame, bar_type: Any, instrument: Any) -> list
     for row in frame.sort("ts").iter_rows(named=True):
         ts = row["ts"]
         assert isinstance(ts, datetime)
+        # A tz-naive timestamp would be read as host-local time by .timestamp();
+        # normalize to UTC so bar times never shift by the machine's offset.
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
         ts_ns = int(ts.timestamp() * 1_000_000_000)
         bars.append(
             Bar(

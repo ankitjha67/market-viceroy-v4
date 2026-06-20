@@ -75,7 +75,11 @@ def _rate_limited_step(
     if max_step == 0.0:
         return dict(target)
     alpha = min(1.0, max_velocity / max_step)
-    return {name: current.get(name, 0.0) + alpha * deltas[name] for name in target}
+    stepped = {name: current.get(name, 0.0) + alpha * deltas[name] for name in target}
+    # Renormalize so the weights sum to 1 even when the strategy set changed
+    # between updates (a key added/removed breaks the telescoping sum otherwise).
+    total = sum(stepped.values())
+    return {name: weight / total for name, weight in stepped.items()} if total else stepped
 
 
 def _sharpe(returns: Sequence[float]) -> float:

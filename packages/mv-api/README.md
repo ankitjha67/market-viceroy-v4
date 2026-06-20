@@ -2,4 +2,4 @@
 
 FastAPI backend and WebSocket streams; Operator-authed mutating endpoints.
 
-**Status:** Phase-0 typed skeleton (empty). Implemented in **Phase 1**.
+**Status: Built (Phase 1+).** FastAPI + Operator-authed WebSocket; the full Command-Deck endpoint surface (decisions, agents, post-mortem, arbitrage, strategies, graduate, risk/journal/settings).
