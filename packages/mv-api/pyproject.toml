@@ -9,12 +9,14 @@ authors = [{ name = "Ankit Jha" }]
 dependencies = [
     "pydantic>=2.7",
     "fastapi>=0.110",
+    "uvicorn>=0.30",
     "pandas>=2.2",
     "alphakit-bench",
     "alphakit-bridges",
     "mv-agents",
     "mv-failover",
     "mv-journal",
+    "mv-postmortem",
     "mv-risk",
     "nautilus_trader==1.228.0",
 ]
@@ -22,6 +24,7 @@ dependencies = [
 [project.scripts]
 mv-paper = "mv.api.cli:paper_main"
 mv-kill = "mv.api.cli:kill_main"
+mv-serve = "mv.api.cli:serve_main"
 
 [build-system]
 requires = ["hatchling>=1.25"]

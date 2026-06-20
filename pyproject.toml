@@ -239,6 +239,8 @@ module = [
     "fredapi.*",
     "requests",
     "requests.*",
+    "uvicorn",
+    "uvicorn.*",
     "scipy",
     "scipy.*",
     "ccxt",
