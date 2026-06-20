@@ -1,0 +1,73 @@
+.nav {
+  border-right: 1px solid var(--rule);
+  padding: var(--space-6) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  background: var(--surface);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mark {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.1;
+}
+
+.sub {
+  color: var(--ink-faint);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.link {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink-soft);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.link:hover {
+  background: var(--surface-sunk);
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.active {
+  background: var(--surface-sunk);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.footer {
+  margin-top: auto;
+  font-size: 11px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-top: 1px solid var(--rule);
+  padding-top: var(--space-3);
+}

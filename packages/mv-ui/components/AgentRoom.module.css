@@ -1,0 +1,184 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: var(--space-3);
+}
+.head h1 {
+  font-size: 28px;
+}
+.sub {
+  margin: 2px 0 0;
+  color: var(--ink-faint);
+}
+.back {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.pickList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pickList a {
+  display: grid;
+  grid-template-columns: 52px 110px 1fr;
+  gap: var(--space-3);
+  align-items: baseline;
+  padding: var(--space-2) var(--space-1);
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+}
+.pickList a:hover {
+  background: var(--surface-sunk);
+  text-decoration: none;
+}
+.pickAction {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+.pickAction[data-action="BUY"] {
+  color: var(--pos);
+}
+.pickAction[data-action="SELL"] {
+  color: var(--neg);
+}
+.pickAction[data-action="HOLD"] {
+  color: var(--ink-faint);
+}
+.pickInstrument {
+  font-family: var(--font-mono);
+}
+.pickRationale {
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Vertical pipeline flow */
+.flow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.node {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: var(--space-3);
+}
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.rail::before {
+  content: "";
+  width: 2px;
+  flex: 1;
+  background: var(--rule);
+}
+.node:first-child .rail::before {
+  background: transparent;
+}
+.bead {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  background: var(--ink-faint);
+  margin: 4px 0;
+  box-shadow: 0 0 0 1px var(--rule-strong);
+}
+.bead[data-tone="bull"] {
+  background: var(--status-green);
+}
+.bead[data-tone="bear"] {
+  background: var(--status-red);
+}
+.bead[data-tone="veto"] {
+  background: var(--accent);
+}
+
+.card {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+  background: var(--surface);
+}
+.cardHead {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 130px 150px 1fr 18px;
+  align-items: baseline;
+  gap: var(--space-3);
+  text-align: left;
+  font: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-3) var(--space-4);
+}
+.kind {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+.title {
+  font-weight: 600;
+}
+.line {
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.chev {
+  font-family: var(--font-mono);
+  color: var(--ink-faint);
+  justify-self: end;
+}
+
+.detail {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 12px;
+}
+.row {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: var(--space-3);
+}
+.row dt {
+  color: var(--ink-faint);
+}
+.row dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+@media (max-width: 820px) {
+  .cardHead {
+    grid-template-columns: 1fr 18px;
+  }
+  .kind,
+  .title {
+    grid-column: 1;
+  }
+}

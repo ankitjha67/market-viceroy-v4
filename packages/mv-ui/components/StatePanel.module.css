@@ -1,0 +1,53 @@
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+}
+
+.bar {
+  height: 14px;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--surface-sunk), var(--rule), var(--surface-sunk));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+.bar:nth-child(2) {
+  width: 88%;
+}
+.bar:nth-child(3) {
+  width: 64%;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.error {
+  border: 1px solid var(--status-red);
+  border-left-width: 3px;
+  background: oklch(0.96 0.03 27);
+  color: var(--ink);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.empty {
+  color: var(--ink-faint);
+  font-style: italic;
+  padding: var(--space-6) 0;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}

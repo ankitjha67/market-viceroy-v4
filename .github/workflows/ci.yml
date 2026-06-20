@@ -38,6 +38,32 @@ jobs:
       - name: mypy --strict
         run: uv run mypy --strict packages/
 
+  frontend:
+    name: mv-ui (lint + types + test + build) / node 22
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: packages/mv-ui
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/mv-ui/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm run test
+      - name: Build
+        run: npm run build
+
   test:
     name: pytest + coverage gate / 3.12
     runs-on: ubuntu-latest
