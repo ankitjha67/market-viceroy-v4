@@ -4,3 +4,8 @@ out/
 next-env.d.ts
 *.tsbuildinfo
 .env*.local
+
+# The root .gitignore ignores `lib/` (a Python build-dir convention); this is a
+# real source directory in the front end, so re-include it here.
+!lib/
+!lib/**
