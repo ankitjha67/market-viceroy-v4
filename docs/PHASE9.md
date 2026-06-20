@@ -62,7 +62,42 @@ reconciliation) instead of a fixture. Unmapped classes return `None` honestly.
 
 ## Track 9B — heavy (MLflow + forecasting)
 
-See the 9B section appended with PR 9B: MLflow experiment tracking (local file
-store, opt-in) and the forecasting layer (a seeded scikit-learn GBM forecaster —
-point-in-time, leakage-checked, never trained on FRED — with LSTM/FinBERT as an
-optional offline `forecasting-deep` extra and a deterministic fallback).
+### MLflow experiment tracking (`mv-intelligence/tracking.py`)
+`log_experiment(experiment, params, metrics, tags, uri)` logs one run to a local
+**SQLite** MLflow store (MLflow 3.x retired the file store) and returns the
+run_id. **Opt-in + no-op by default:** with no `uri`/`MLFLOW_TRACKING_URI` it
+returns `None` and touches nothing, so the per-push gate stays deterministic and
+side-effect-free. It is the log point for the validation gate, governed
+weight-proposals, and forecaster training. Tested against a temp store.
+
+### Forecasting layer (`mv-intelligence/forecasting/`)
+- **`GBMForecaster`** — the deterministic CI default: a **seeded** scikit-learn
+  `GradientBoostingRegressor`. **Point-in-time** (`fit_window` slices to rows
+  strictly before the as-of — no look-ahead), **FRED-no-train** (`guard_training_sources`
+  rejects FRED-derived sources, FR-D11/BR-006), reproducible (identical
+  predictions across runs).
+- **`FinBERTSentiment`** / **`LSTMForecaster`** — the optional offline deep
+  forecasters (`forecasting-deep` extra: torch/transformers). They run **offline
+  only** (model load/inference `# pragma: no cover`) and **fall back
+  deterministically** when the extra is absent (the CI default): FinBERT → the
+  Phase-3 rule-based lexicon; LSTM → the seeded GBM. The fallback selection, the
+  FinBERT signed-label mapping, and the FRED guard are unit-tested. Real wiring
+  with a real fallback — not a stub.
+
+### Dependencies
+`scikit-learn` + `mlflow` enter the core lock (build time ↑). **torch/transformers
+stay in the `forecasting-deep` optional extra**, *not* installed by the per-push
+CI (`uv sync --extra dev`), so CI runs the deterministic fallback path and stays
+light.
+
+### Verification (9B, all green)
+MLflow temp-store logging round-trip; GBM determinism + as-of/no-look-ahead +
+FRED-no-train; the deep forecasters' offline fallbacks + FinBERT label mapping.
+Full Python gate: ruff / mypy --strict (810 files) / **pytest 2725 passed**,
+coverage 93%. The deep extra is not exercised in CI by design.
+
+## Excluded (flagged, not built)
+- **India private-repo content** — blocked; share the four private repos to fold
+  in the india-preopen quant engine + nse-market-intel research agent.
+- **Real-money go-live** — the Operator's manual, funded action; the agent never
+  automates real-money orders. The graduation machinery + runbook exist (Phase 7).

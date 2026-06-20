@@ -251,6 +251,14 @@ module = [
     "langgraph.*",
     "langchain_core",
     "langchain_core.*",
+    "sklearn",
+    "sklearn.*",
+    "mlflow",
+    "mlflow.*",
+    "torch",
+    "torch.*",
+    "transformers",
+    "transformers.*",
 ]
 ignore_missing_imports = true
 follow_imports = "skip"
