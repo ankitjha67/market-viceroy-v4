@@ -44,6 +44,9 @@ class ApiState:
     replay_provider: Callable[[dict[str, Any]], dict[str, Any]] | None = None
     # Arbitrage Monitor (Phase 6): ranked opportunities + after-cost edge + R/A/G.
     arbitrage_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
+    # Graduation (Phase 7): live status per strategy + the Operator-signed handler.
+    live_status_provider: Callable[[str], str | None] = field(default=lambda _slug: None)
+    graduate_handler: Callable[[str, str], dict[str, Any]] | None = None
 
 
 def create_app(state: ApiState) -> FastAPI:
@@ -143,7 +146,30 @@ def create_app(state: ApiState) -> FastAPI:
 
     @app.get("/api/v1/strategies")
     def strategies() -> list[dict[str, Any]]:
-        return list_strategies()
+        rows = list_strategies()
+        for row in rows:
+            row["live_status"] = state.live_status_provider(row["slug"]) or "paper"
+        return rows
+
+    @app.post("/api/v1/strategies/{slug}/graduate")
+    def graduate(slug: str, operator_id: str, _: None = operator) -> dict[str, Any]:
+        """Operator sign-off to promote a strategy to live (FR-P6, BR-005).
+
+        Single-operator-token authed and journaled. Promotes only if the
+        strategy is eligible (sustained honest paper record) AND compliance is
+        all-clear; otherwise 422 with the blocking reasons. Every attempt —
+        success or rejection — is journaled for the audit trail.
+        """
+        if state.graduate_handler is None:
+            raise HTTPException(status_code=503, detail="graduation is not configured")
+        result = state.graduate_handler(slug, operator_id)
+        state.journal.append("graduation", {"slug": slug, "operator": operator_id, **result})
+        if not result.get("graduated", False):
+            raise HTTPException(
+                status_code=422,
+                detail={"slug": slug, "reasons": result.get("reasons", [])},
+            )
+        return {"slug": slug, **result}
 
     @app.get("/api/v1/strategies/{slug}")
     def strategy_detail(slug: str) -> dict[str, Any]:

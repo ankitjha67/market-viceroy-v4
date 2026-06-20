@@ -90,6 +90,61 @@ def test_arbitrage_empty_by_default() -> None:
     assert client.get("/api/v1/arbitrage").json() == []
 
 
+def _graduation_client(handler: object) -> tuple[TestClient, Journal]:
+    journal = Journal()
+    state = ApiState(
+        kill_switch=KillSwitch(),
+        journal=journal,
+        operator_token=_TOKEN,
+        graduate_handler=handler,  # type: ignore[arg-type]
+    )
+    return TestClient(create_app(state)), journal
+
+
+def test_graduate_requires_operator_token() -> None:
+    client, _ = _graduation_client(lambda _s, _o: {"graduated": True})
+    resp = client.post("/api/v1/strategies/ema/graduate", params={"operator_id": "ankit"})
+    assert resp.status_code == 401
+
+
+def test_graduate_success_is_journaled() -> None:
+    handler = lambda slug, operator: {"graduated": True, "reasons": [], "live_cap_pct": "0.01"}  # noqa: E731
+    client, journal = _graduation_client(handler)
+    resp = client.post(
+        "/api/v1/strategies/ema/graduate",
+        params={"operator_id": "ankit"},
+        headers={"X-Operator-Token": _TOKEN},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["graduated"] is True
+    grads = [e for e in journal.entries() if e.kind == "graduation"]
+    assert grads and grads[0].payload["operator"] == "ankit"
+
+
+def test_graduate_ineligible_returns_422_and_is_journaled() -> None:
+    handler = lambda slug, operator: {"graduated": False, "reasons": ["OOS Sharpe too low"]}  # noqa: E731
+    client, journal = _graduation_client(handler)
+    resp = client.post(
+        "/api/v1/strategies/weak/graduate",
+        params={"operator_id": "ankit"},
+        headers={"X-Operator-Token": _TOKEN},
+    )
+    assert resp.status_code == 422
+    assert "OOS Sharpe too low" in resp.json()["detail"]["reasons"]
+    # The rejected attempt is still journaled (audit trail).
+    assert any(e.kind == "graduation" for e in journal.entries())
+
+
+def test_graduate_unconfigured_returns_503() -> None:
+    client, _, _ = _client()
+    resp = client.post(
+        "/api/v1/strategies/ema/graduate",
+        params={"operator_id": "ankit"},
+        headers={"X-Operator-Token": _TOKEN},
+    )
+    assert resp.status_code == 503
+
+
 def test_agent_room_returns_pipeline_for_snapshot() -> None:
     kill = KillSwitch()
     journal = Journal()

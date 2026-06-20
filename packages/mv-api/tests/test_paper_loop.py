@@ -117,6 +117,65 @@ def test_agent_graph_loop_journals_full_transcript_and_fills() -> None:
         engine.dispose()
 
 
+def test_live_mode_blocks_ungraduated_strategy() -> None:
+    # BR-005: in live mode an ungraduated symbol produces no order — journaled.
+    from mv.risk.live_guard import LiveGuardConfig
+
+    journal = Journal()
+    risk = RiskEngine(RiskLimits.aggressive(), KillSwitch())
+    instrument = TestInstrumentProvider.btcusdt_binance()
+    engine = run_paper_session(
+        frame=_rising_frame(60),
+        symbol="BTC/USDT",
+        timeframe="1h",
+        strategies=_strategies(),
+        risk_engine=risk,
+        journal=journal,
+        instrument=instrument,
+        warmup=30,
+        starting_equity=Decimal("1000000"),
+        live_guard=LiveGuardConfig(mode="live", graduated=frozenset()),
+    )
+    try:
+        kinds = [e.kind for e in journal.entries()]
+        assert "decision" in kinds  # decisions still flow
+        assert "execution" not in kinds  # but nothing trades live
+        assert "live_blocked" in kinds  # the block is journaled (BR-005)
+        assert len(engine.cache.positions()) == 0
+    finally:
+        engine.dispose()
+
+
+def test_live_mode_caps_graduated_strategy() -> None:
+    from mv.risk.live_guard import LiveGuardConfig
+
+    journal = Journal()
+    risk = RiskEngine(RiskLimits.aggressive(), KillSwitch())
+    instrument = TestInstrumentProvider.btcusdt_binance()
+    engine = run_paper_session(
+        frame=_rising_frame(60),
+        symbol="BTC/USDT",
+        timeframe="1h",
+        strategies=_strategies(),
+        risk_engine=risk,
+        journal=journal,
+        instrument=instrument,
+        warmup=30,
+        starting_equity=Decimal("1000000"),
+        live_guard=LiveGuardConfig(
+            mode="live", graduated=frozenset({"BTC/USDT"}), live_cap_pct=Decimal("0.01")
+        ),
+    )
+    try:
+        executions = [e for e in journal.entries() if e.kind == "execution"]
+        assert len(executions) >= 1  # a graduated symbol trades
+        # Each live fill notional is clamped to the 1% cap (10k on 1M equity).
+        for fill in executions:
+            assert abs(Decimal(fill.payload["notional"])) <= Decimal("10000") + Decimal("100")
+    finally:
+        engine.dispose()
+
+
 def test_kill_switch_halts_the_loop() -> None:
     journal = Journal()
     kill = KillSwitch()

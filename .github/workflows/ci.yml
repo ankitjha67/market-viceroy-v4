@@ -159,6 +159,8 @@ jobs:
         run: uv run pytest -m integration packages/alphakit-bench -v
       - name: Improvement-ledger Postgres round-trip (FR-P4)
         run: uv run pytest -m integration packages/mv-postmortem -v
+      - name: Graduation Postgres round-trip (FR-P6)
+        run: uv run pytest -m integration packages/mv-api -v
       - name: Data-pipe smoke (CCXT -> ClickHouse)
         run: uv run pytest -m integration packages/mv-failover -v
       - name: Run the mv-smoke CLI
