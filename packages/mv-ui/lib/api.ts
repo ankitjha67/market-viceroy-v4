@@ -51,4 +51,11 @@ export const ENDPOINTS = {
   decisions: "/api/v1/decisions",
   sourceHealth: "/api/v1/health/sources",
   agents: (snapshot: string) => `/api/v1/decisions/${snapshot}/agents`,
+  strategies: "/api/v1/strategies",
+  arbitrage: "/api/v1/arbitrage",
+  mistakes: "/api/v1/postmortem/mistakes",
+  improvements: "/api/v1/postmortem/improvements",
+  riskLimits: "/api/v1/risk/limits",
+  settings: "/api/v1/settings",
+  journal: "/api/v1/journal",
 } as const;

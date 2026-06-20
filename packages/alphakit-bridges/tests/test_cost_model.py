@@ -62,3 +62,26 @@ def test_india_tax_on_gain_and_tds() -> None:
     assert tax.on_gain(Decimal("-1000")) == Decimal("0")  # no tax on a loss
     assert tax.tds(Decimal("10000")) == Decimal("100")  # 1%
     assert tax.total(Decimal("1000"), Decimal("10000")) == Decimal("400")
+
+
+# --- Live-fill slippage recalibration write-back (FR-X4) -------------------
+
+
+def test_slippage_calibration_writeback() -> None:
+    from decimal import Decimal
+
+    from alphakit.bridges.cost_model import (
+        calibrated_slippage_bps,
+        clear_slippage_calibration,
+        set_slippage_calibration,
+    )
+
+    clear_slippage_calibration()
+    # With no calibration the model fallback is used.
+    assert calibrated_slippage_bps("binance", Decimal("10")) == Decimal("10")
+    # After a recalibration write-back, the empirical value is read instead.
+    set_slippage_calibration("binance", Decimal("23"))
+    assert calibrated_slippage_bps("binance", Decimal("10")) == Decimal("23")
+    # Unknown venues still fall back.
+    assert calibrated_slippage_bps("kraken", Decimal("16")) == Decimal("16")
+    clear_slippage_calibration()

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
+import { LiveStream } from "@/components/LiveStream";
 import styles from "./layout.module.css";
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Nav />
           <main className={styles.main}>{children}</main>
         </div>
+        <LiveStream />
       </body>
     </html>
   );

@@ -4,11 +4,16 @@ import useSWR from "swr";
 import { ENDPOINTS, getJson } from "./api";
 import type {
   AgentPipeline,
+  AgentRecord,
+  ArbOpportunity,
+  CategoryStat,
   DecisionRow,
   Health,
+  Improvement,
   Portfolio,
   Position,
   SourceHealthRow,
+  Strategy,
 } from "./types";
 import type { LoadState } from "@/components/StatePanel";
 
@@ -55,3 +60,32 @@ export const useAgentPipeline = (snapshot: string | null): Polled<AgentPipeline>
     snapshot ? ENDPOINTS.agents(encodeURIComponent(snapshot)) : null,
     (d) => d.pipeline.length === 0,
   );
+
+export const useStrategies = (): Polled<Strategy[]> =>
+  usePolled<Strategy[]>(ENDPOINTS.strategies, (d) => d.length === 0);
+
+export const useArbitrage = (): Polled<ArbOpportunity[]> =>
+  usePolled<ArbOpportunity[]>(ENDPOINTS.arbitrage, (d) => d.length === 0);
+
+export const useMistakes = (): Polled<Record<string, CategoryStat>> =>
+  usePolled<Record<string, CategoryStat>>(ENDPOINTS.mistakes, (d) => Object.keys(d).length === 0);
+
+export const useImprovements = (): Polled<Improvement[]> =>
+  usePolled<Improvement[]>(ENDPOINTS.improvements, (d) => d.length === 0);
+
+export const useRiskLimits = (): Polled<Record<string, string>> =>
+  usePolled<Record<string, string>>(ENDPOINTS.riskLimits, (d) => Object.keys(d).length === 0);
+
+export const useSettings = (): Polled<Record<string, unknown>> =>
+  usePolled<Record<string, unknown>>(ENDPOINTS.settings, (d) => Object.keys(d).length === 0);
+
+export const useJournal = (kind: string, q: string): Polled<AgentRecord[]> => {
+  const params = new URLSearchParams();
+  if (kind) params.set("kind", kind);
+  if (q) params.set("q", q);
+  const suffix = params.toString();
+  return usePolled<AgentRecord[]>(
+    `${ENDPOINTS.journal}${suffix ? `?${suffix}` : ""}`,
+    (d) => d.length === 0,
+  );
+};

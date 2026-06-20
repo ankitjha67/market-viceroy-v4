@@ -7,7 +7,13 @@ import styles from "./Nav.module.css";
 const LINKS: ReadonlyArray<{ href: string; label: string }> = [
   { href: "/", label: "Command Deck" },
   { href: "/agents", label: "Agent Room" },
+  { href: "/strategies", label: "Strategy Lab" },
+  { href: "/postmortem", label: "Post-Mortem Room" },
+  { href: "/arbitrage", label: "Arbitrage Monitor" },
+  { href: "/risk", label: "Risk Console" },
+  { href: "/journal", label: "Journal Explorer" },
   { href: "/health", label: "Source Health" },
+  { href: "/settings", label: "Settings" },
 ];
 
 export function Nav() {
