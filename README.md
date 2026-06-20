@@ -1,67 +1,105 @@
 # Market Viceroy v4
 
 Autonomous multi-agent trading platform. Paper-first on free live data; agents
-research → decide Buy/Sell/Hold → execute within **inviolable** risk limits;
-tamper-evident decision journal + causal post-mortem; graduates to live only
-through explicit gates. Crypto-first MVP → India → rest of world.
+research → debate → decide Buy/Sell/Hold → execute within **inviolable** risk
+limits; tamper-evident decision journal + causal post-mortem; graduates to live
+only through explicit, Operator-signed gates. Crypto-first → India → US/FX.
 
-The authoritative product spec (PRD, build plan v2, repo audit) and the
-engineering standards / non-negotiables are kept internal and are not
-published to this repository.
+The authoritative product spec (PRD, build plan, repo audit) and the engineering
+standards / non-negotiables are kept internal and are not published here.
 
-## Status — Phase 1 (MVP: crypto-paper trading loop) complete
+## Status — Phases 0–9 complete
 
-The end-to-end MVP loop runs on crypto data, paper only:
+The full platform is built end-to-end (paper-first; no real-money orders are
+ever placed autonomously). Each phase shipped behind hard CI gates — `ruff`,
+`mypy --strict`, `pytest` ≥85% coverage, plus a frontend gate (`eslint` / `tsc`
+/ `vitest` / `next build`). See `docs/PHASE0.md … PHASE9.md` for per-phase
+exit-gate evidence.
 
-> Failover Governor (binance→kraken→coinbase) → all strategies → equal-weight
-> ensemble → **inviolable risk gate** → NautilusTrader paper fill (fees +
-> slippage + crypto-tax modeled) → **tamper-evident hash-chained journal**.
+```
+Failover Governor (multi-source, circuit-broken) → point-in-time features
+  → multi-agent pipeline: Research → Bull/Bear debate → Research Manager
+     → Risk veto (inviolable) → Portfolio Manager → Buy/Sell/Hold
+  → NautilusTrader execution (paper↔live parity; modeled fees/slippage/tax)
+  → tamper-evident hash-chained journal
+  → Post-Mortem: causal attribution + mistake taxonomy + counterfactual replay
+  → governed, propose-only meta-learning (held-out validated; human-gated to live)
+```
 
-- **US-001/003/007/008** demonstrated (deterministic tests). See
-  [docs/PHASE1.md](docs/PHASE1.md) for the exit-gate evidence; Phase 0 in
-  [docs/PHASE0.md](docs/PHASE0.md).
-- Execution spine: **NautilusTrader 1.228** (paper↔live parity via its native
-  `Strategy`). Risk engine + **Operator-only kill-switch**. Failover governor
-  (circuit breakers, reconciliation, staleness, health). Hash-chained journal.
-- Gates on **3.12**: ~2477 passed, ~92.6% coverage (≥85 hard gate), mypy
-  `--strict` clean, ruff clean. CI adds ClickHouse + Postgres service
-  containers (migrations + journal round-trip + live CCXT smoke).
+### What's built
+- **Data plane + Failover Governor** — circuit breakers, primary→fallback
+  ladders, reconciliation, staleness, health. Adapters: crypto (CCXT), US
+  (Finnhub→Alpaca), FX (Frankfurter), **India equities (Dhan→Upstox→Kotak→
+  Zerodha→Angel One)**.
+- **Validation gate** — walk-forward + regime + deflated Sharpe + Monte-Carlo;
+  honest `active`/`observe`/`failed`. Synthetic results can never reach `active`.
+- **Intelligence** — point-in-time feature store (as-of joins, CI leakage check),
+  indicators, SEC-EDGAR fundamentals, rule-based sentiment, **FRED no-train**
+  guardrail; **forecasting** (deterministic GBM; optional offline FinBERT/LSTM).
+- **Agents** — a real LangGraph pipeline (deterministic-first; per-agent hybrid
+  LLM routing wired, offline) producing the journaled Buy/Sell/Hold.
+- **Risk** — pre-trade limits (position/exposure/concentration/daily-loss/
+  drawdown/Kelly), **Operator-only kill-switch**, capped-live guard (BR-005).
+- **Post-Mortem & learning** — attribution that sums to net, mistake taxonomy,
+  counterfactual replay, improvement ledger, **propose-only** governed weights;
+  live-slippage recalibration; projection-honesty tracking.
+- **Gated live** — Conservative graduation bar + §13 compliance checklist +
+  per-strategy Operator sign-off; de-graduation on breach. **No real-money
+  orders are ever automated.**
+- **Executable arbitrage** — crypto cross-exchange / funding / triangular, shown
+  after cost with Red/Amber/Green executability; cross-border is monitor-only.
+- **Command Deck UI** — a React/Next.js app (9 screens): Command Deck, Agent
+  Room, Strategy Lab, Post-Mortem Room, Arbitrage Monitor, Risk Console, Journal
+  Explorer, Source Health, Settings. REST polling + an authed WebSocket stream;
+  editorial, anti-slop design.
+- **MLflow** experiment tracking (opt-in, local SQLite store).
+
+## Security posture
+Single-operator self-host. Mutating endpoints (kill / reset / graduate / replay)
+and the WebSocket are **Operator-token-authed** (constant-time compare). Reads
+are open but behind an explicit, non-wildcard CORS allow-list — bind the API to
+`127.0.0.1` (or an authenticating proxy) before any non-local exposure. Secrets
+live in env/vault, **never in code**; exchange keys are scoped, withdrawal-
+disabled, IP-allowlisted. All SQL is parameterized.
 
 ## Quickstart
 
 ```bash
-uv sync --extra dev          # install the workspace on Python 3.12
-
-uv run pytest                # full suite + ≥85% coverage gate
+uv sync --extra dev              # install the Python workspace on 3.12
+uv run pytest                    # full suite + ≥85% coverage gate
 uv run mypy --strict packages/
-uv run ruff check .
-uv run ruff format --check .
+uv run ruff check . && uv run ruff format --check .
 
-cp .env.example .env         # set local passwords
-docker compose up -d         # ClickHouse + Postgres + Redis
-uv run mv-migrate            # apply the Postgres schema
-MV_RUN_SMOKE=1 uv run mv-smoke   # CCXT -> ClickHouse round-trip (data-pipe smoke)
-uv run mv-paper              # one live paper session (governor -> ensemble -> risk -> fills)
-uv run mv-kill "reason"      # Operator kill-switch
+cp .env.example .env             # set local passwords + any API keys
+docker compose up -d             # ClickHouse + Postgres + Redis
+uv run mv-migrate                # apply the Postgres schema
+uv run mv-paper                  # one live paper session (governor → agents → risk → fills)
+uv run mv-kill "reason"          # Operator kill-switch
+
+# Command Deck UI
+cd packages/mv-ui && npm ci && npm run dev   # http://localhost:3000
 ```
+
+Offline demos: `scripts/run_agents.py` (agent transcript), `scripts/run_postmortem.py`
+(attribution + learning), `scripts/run_arbitrage.py` (after-cost arb monitor).
 
 ## Package map (uv workspace)
 
-| Package | Status | Responsibility |
-|---|---|---|
-| `alphakit-core` | ported | protocols, instruments, data structs, metrics, portfolio |
-| `alphakit-strategies-*` (9) | ported | 109 strategy modules |
-| `alphakit-bridges` | ported | vectorbt / backtrader / lean engine bridges |
-| `alphakit-bench` | ported | benchmark/validation harness (→ validation gate, Ph2) |
-| `alphakit-data` | ported | adapters + registry/cache/rate_limit (→ folds into mv-failover, Ph1) |
-| `mv-failover` | skeleton + smoke | failover governor (Ph1); ships the Phase-0 data-pipe smoke |
-| `mv-intelligence` | skeleton | point-in-time intelligence features (Ph3) |
-| `mv-agents` | skeleton | LangGraph agents → Buy/Sell/Hold (Ph4) |
-| `mv-journal` | skeleton | tamper-evident hash-chained journal (Ph1) |
-| `mv-postmortem` | skeleton | attribution, mistake taxonomy, meta-learning (Ph5) |
-| `mv-risk` | skeleton | risk engine + **inviolable** kill-switch (Ph1) |
-| `mv-api` | skeleton | FastAPI + WebSocket (Ph1) |
-| `mv-ui` | placeholder | React/Next.js Command Deck (Ph4/8) |
+| Package | Responsibility |
+|---|---|
+| `alphakit-core` | protocols, instruments, data structs, metrics, portfolio |
+| `alphakit-strategies-*` (9) | 109 strategy modules (`StrategyProtocol`) |
+| `alphakit-bridges` | NautilusTrader paper/live bridge + cost model; vectorbt/backtrader/lean |
+| `alphakit-bench` | validation gate (walk-forward, regime, deflated Sharpe, Monte-Carlo) |
+| `alphakit-data` | data adapters + registry/cache/rate-limit |
+| `mv-failover` | failover governor + regional adapters (crypto/US/India/FX) |
+| `mv-intelligence` | point-in-time features, sentiment, forecasting, MLflow tracking |
+| `mv-agents` | LangGraph multi-agent pipeline + LLM seam → Buy/Sell/Hold |
+| `mv-journal` | tamper-evident hash-chained decision journal |
+| `mv-postmortem` | attribution, mistake taxonomy, replay, governed meta-learning |
+| `mv-risk` | risk engine, inviolable kill-switch, graduation/de-graduation, live guard |
+| `mv-api` | FastAPI + WebSocket (Operator-authed mutations) |
+| `mv-ui` | React/Next.js Command Deck (9 screens) |
 
 ## License
 

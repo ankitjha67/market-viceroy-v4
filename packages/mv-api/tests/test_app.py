@@ -271,10 +271,18 @@ def test_mistakes_and_improvements_endpoints() -> None:
 
 def test_replay_endpoint_and_unconfigured() -> None:
     client = _postmortem_client()
-    body = client.post("/api/v1/postmortem/replay", json={"variable": "size_multiplier"}).json()
+    headers = {"X-Operator-Token": _TOKEN}
+    # Replay is Operator-authed (expensive re-run): no token -> 401.
+    assert client.post("/api/v1/postmortem/replay", json={"variable": "x"}).status_code == 401
+    body = client.post(
+        "/api/v1/postmortem/replay", json={"variable": "size_multiplier"}, headers=headers
+    ).json()
     assert body["variable"] == "size_multiplier"
     assert body["delta"] == "-50"
 
     # No replay provider -> 503.
     bare = TestClient(create_app(ApiState(KillSwitch(), Journal(), _TOKEN)))
-    assert bare.post("/api/v1/postmortem/replay", json={"variable": "x"}).status_code == 503
+    assert (
+        bare.post("/api/v1/postmortem/replay", json={"variable": "x"}, headers=headers).status_code
+        == 503
+    )

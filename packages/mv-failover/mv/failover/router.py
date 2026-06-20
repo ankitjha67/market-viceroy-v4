@@ -118,7 +118,9 @@ class DataSourceRouter:
                 event = FailoverEvent(
                     domain=str(domain),
                     symbol=symbol,
-                    from_source=skipped[0],
+                    # The immediate predecessor we failed over *from* (not the
+                    # first source tried) — correct on ladders deeper than two.
+                    from_source=skipped[-1],
                     to_source=spec.name,
                     reason="served_after_failover",
                 )

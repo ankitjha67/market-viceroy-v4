@@ -89,6 +89,19 @@ def test_failover_when_primary_stale() -> None:
     assert result.failovers[0].from_source == "binance"
 
 
+def test_failover_event_names_the_immediate_predecessor() -> None:
+    # On a ladder deeper than two, from_source must be the source we actually
+    # failed over *from* (the last one skipped), not the first tried.
+    a = _FakeFeed("binance", error=ConnectionError("429"))
+    b = _FakeFeed("kraken", error=ConnectionError("timeout"))
+    c = _FakeFeed("coinbase", frame=_frame(_T0, source="ccxt:coinbase"))
+    sink = CollectingSink()
+    result = _router(_registry(a, b, c), sink).get_bars(CRYPTO_PRICES, "BTC/USDT", "1h")
+    assert result.source == "coinbase"
+    assert result.failovers[0].from_source == "kraken"  # predecessor, not "binance"
+    assert result.failovers[0].to_source == "coinbase"
+
+
 def test_open_breaker_skips_source_without_calling_it() -> None:
     primary = _FakeFeed("binance", error=ConnectionError("down"))
     secondary = _FakeFeed("kraken", frame=_frame(_T0, source="ccxt:kraken"))

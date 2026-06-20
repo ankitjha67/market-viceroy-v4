@@ -5,7 +5,7 @@ fundamental / macro / news data, with a provider registry, per-vendor
 rate-limit token buckets, circuit breakers, primary→fallback ladders,
 cross-source reconciliation, and a staleness guard (PRD §4.1).
 
-**Status:** Phase-0 typed skeleton **plus** the thin end-to-end smoke that
+**Status: Built (Phase 1+).** The full governor (circuit breakers, ladders, reconciliation, staleness, health) with regional adapters — crypto (CCXT), US (Finnhub/Alpaca), FX (Frankfurter), and India equities (Dhan primary, then Upstox/Kotak/Zerodha/Angel One). Originally the Phase-0 smoke that
 proves the data pipe. The full governor extends `alphakit-data`'s
 `registry` / `cache` / `rate_limit` in **Phase 1** and is not built here.
 

@@ -43,9 +43,42 @@ CI uses the platform's encrypted secret store (GitHub Actions secrets); the
 Phase-0 CI smoke job uses throwaway service-container credentials, not real
 ones.
 
+## Exchange / broker keys (read from env at call time, never in code)
+
+Every market-data / broker adapter reads its key(s) from environment variables
+inside the network-gated fetch, places them only into request headers, and never
+logs or returns them. Missing-key errors carry a static message (no key value).
+The full placeholder list is in `.env.example`. By region:
+
+- **Crypto** — CCXT public OHLCV needs no key (`BINANCE_API_KEY`/secret only for
+  trading).
+- **US equities** — `FINNHUB_API_KEY` (primary), `ALPACA_API_KEY`/`ALPACA_API_SECRET`.
+- **FX** — Frankfurter is keyless.
+- **India equities** — **Dhan primary** (`DHAN_ACCESS_TOKEN`/`DHAN_CLIENT_ID`),
+  then Upstox (`UPSTOX_ACCESS_TOKEN`), Kotak (`KOTAK_ACCESS_TOKEN`/`KOTAK_CONSUMER_KEY`),
+  Zerodha (`ZERODHA_API_KEY`/`ZERODHA_ACCESS_TOKEN` — Kite is **internal-use only,
+  no redistribution**), Angel One (`ANGELONE_API_KEY`/`ANGELONE_ACCESS_TOKEN`).
+- **Macro/other** — `FRED_API_KEY` (runtime input ONLY — never trained on),
+  `EIA_API_KEY`, `POLYGON_API_KEY`. LLM: `ANTHROPIC_API_KEY` (optional, offline).
+
 ## Exchange-key policy (enforced before any live trading — Phase 7)
 
 - **Scoped** to trading only; **withdrawals DISABLED** on the key.
 - **IP-allowlisted** to the deployment host.
 - Stored in the vault, injected as env at runtime; rotated on any suspected
   compromise. Withdrawal-disabled keys bound the blast radius of a leak.
+
+## API / network posture (Phase 9 hardening)
+
+- **Operator token** guards every mutating/expensive route (kill, reset,
+  graduate, replay) and the `/ws/stream` WebSocket; compared **constant-time**
+  (`hmac.compare_digest`). The app refuses to start with an empty token.
+- **CORS** is an explicit, non-wildcard allow-list (`MV_UI_ORIGIN`, default the
+  Next.js dev origin) — never `*`, since reads expose the trading posture.
+- **Reads are open** for the single-operator UX but should be reached only over
+  loopback (`127.0.0.1`) or behind an authenticating reverse proxy before any
+  non-local exposure. All SQL is parameterized; the journal search filters
+  in-memory with a clamped limit.
+- The `/settings` endpoint returns an **allow-list of non-secret config** only —
+  never the `Settings` model (which carries DB passwords). Keep it that way when
+  wiring the provider.

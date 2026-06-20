@@ -1,7 +1,7 @@
 [project]
 name = "mv-failover"
 version = "0.0.1"
-description = "Data-plane failover governor (Phase 1). Ships the Phase-0 CCXT->ClickHouse smoke."
+description = "Data-plane failover governor: circuit breakers, primary->fallback ladders, reconciliation, staleness; regional adapters (crypto/US/India/FX, Dhan-primary India)."
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.12"

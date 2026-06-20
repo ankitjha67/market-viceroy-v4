@@ -12,8 +12,12 @@ from __future__ import annotations
 from mv.failover.adapters.alpaca_feed import AlpacaBarFeed
 from mv.failover.adapters.angelone_feed import AngelOneBarFeed
 from mv.failover.adapters.ccxt_feed import CcxtBarFeed
+from mv.failover.adapters.dhan_feed import DhanBarFeed
 from mv.failover.adapters.finnhub_feed import FinnhubBarFeed
 from mv.failover.adapters.frankfurter_feed import FrankfurterRateFeed
+from mv.failover.adapters.kotak_feed import KotakBarFeed
+from mv.failover.adapters.upstox_feed import UpstoxBarFeed
+from mv.failover.adapters.zerodha_feed import ZerodhaBarFeed
 from mv.failover.registry import (
     CRYPTO_PRICES,
     FX_RATES,
@@ -69,16 +73,48 @@ def us_prices_ladder() -> list[SourceSpec]:
 
 
 def india_prices_ladder() -> list[SourceSpec]:
-    """Build the Angel One ladder for India equity ``equity.prices``.
+    """Build the India-equity ``equity.prices`` ladder — **Dhan primary**.
 
-    Upstox/Dhan fallbacks (and the india-preopen strategies + nse-market-intel
-    research agent) fold in with the four private repos — this is the contract
-    they plug into.
+    Operator-held broker accounts, in failover order: Dhan (primary) → Upstox →
+    Kotak Securities → Zerodha → Angel One. All are internal-use only; Zerodha
+    (Kite) additionally prohibits data redistribution (§13).
     """
     return [
         SourceSpec(
-            name="angelone",
+            name="dhan",
             priority=0,
+            feed=DhanBarFeed(),
+            licensing_tag="internal-only",
+            rate_cap="broker-tier",
+            cost_tag="free",
+        ),
+        SourceSpec(
+            name="upstox",
+            priority=1,
+            feed=UpstoxBarFeed(),
+            licensing_tag="internal-only",
+            rate_cap="broker-tier",
+            cost_tag="free",
+        ),
+        SourceSpec(
+            name="kotak",
+            priority=2,
+            feed=KotakBarFeed(),
+            licensing_tag="internal-only",
+            rate_cap="broker-tier",
+            cost_tag="free",
+        ),
+        SourceSpec(
+            name="zerodha",
+            priority=3,
+            feed=ZerodhaBarFeed(),
+            licensing_tag="internal-only-no-redistribution",
+            rate_cap="broker-tier",
+            cost_tag="free",
+        ),
+        SourceSpec(
+            name="angelone",
+            priority=4,
             feed=AngelOneBarFeed(),
             licensing_tag="internal-only",
             rate_cap="broker-tier",
