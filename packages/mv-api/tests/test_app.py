@@ -118,6 +118,35 @@ def test_portfolio_empty_by_default() -> None:
     assert client.get("/api/v1/health/sources").json() == []
 
 
+def test_risk_limits_and_settings_endpoints() -> None:
+    state = ApiState(
+        kill_switch=KillSwitch(),
+        journal=Journal(),
+        operator_token=_TOKEN,
+        risk_provider=lambda: {"max_position_pct": "0.20", "gross_exposure": "0.5"},
+        settings_provider=lambda: {"mode": "paper", "llm_routing": {}},
+    )
+    client = TestClient(create_app(state))
+    assert client.get("/api/v1/risk/limits").json()["max_position_pct"] == "0.20"
+    assert client.get("/api/v1/settings").json()["mode"] == "paper"
+
+
+def test_journal_search_filters_by_kind_and_text() -> None:
+    journal = Journal()
+    journal.append("decision", {"action": "BUY", "instrument": "BTC/USDT"})
+    journal.append("decision", {"action": "SELL", "instrument": "ETH/USDT"})
+    journal.append("risk_assessment", {"approved": True})
+    client = TestClient(create_app(ApiState(KillSwitch(), journal, _TOKEN)))
+
+    all_rows = client.get("/api/v1/journal").json()
+    assert len(all_rows) == 3
+    decisions = client.get("/api/v1/journal?kind=decision").json()
+    assert len(decisions) == 2
+    btc = client.get("/api/v1/journal?q=BTC").json()
+    assert len(btc) == 1
+    assert btc[0]["payload"]["instrument"] == "BTC/USDT"
+
+
 def _graduation_client(handler: object) -> tuple[TestClient, Journal]:
     journal = Journal()
     state = ApiState(

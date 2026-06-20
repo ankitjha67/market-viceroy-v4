@@ -1,0 +1,119 @@
+/* Shared editorial layout for the Phase-9 read screens. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.head {
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: var(--space-3);
+}
+.head h1 {
+  font-size: 28px;
+}
+.sub {
+  margin: 2px 0 0;
+  color: var(--ink-faint);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink-faint);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--rule);
+}
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--rule);
+}
+.num {
+  text-align: right;
+}
+
+.badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: var(--radius);
+  border: 1px solid var(--rule-strong);
+}
+.badge[data-tone="active"],
+.badge[data-tone="green"] {
+  color: var(--status-green);
+  border-color: var(--status-green);
+}
+.badge[data-tone="observe"],
+.badge[data-tone="amber"] {
+  color: var(--status-amber);
+  border-color: var(--status-amber);
+}
+.badge[data-tone="failed"],
+.badge[data-tone="red"] {
+  color: var(--status-red);
+  border-color: var(--status-red);
+}
+
+.toolbar {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.input,
+.select {
+  font: inherit;
+  font-size: 13px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+.card {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  background: var(--surface);
+}
+.cardTitle {
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
+.kv {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+.kvRow {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dotted var(--rule);
+  padding: 3px 0;
+}
+.kvRow dt {
+  color: var(--ink-faint);
+}
+.kvRow dd {
+  margin: 0;
+}

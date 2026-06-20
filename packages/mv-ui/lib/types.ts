@@ -47,6 +47,40 @@ export interface AgentPipeline {
   pipeline: AgentRecord[];
 }
 
+export interface Strategy {
+  slug: string;
+  family: string;
+  gate_status: "active" | "observe" | "failed";
+  data_source: string;
+  live_status?: string;
+  metrics?: Record<string, number>;
+}
+
+export type Executability = "green" | "amber" | "red";
+
+export interface ArbOpportunity {
+  kind: string;
+  legs: string;
+  gross_edge_bps: string;
+  after_cost_edge_bps: string;
+  executability: Executability;
+  detail: string;
+}
+
+export interface CategoryStat {
+  count: number;
+  cost: string;
+}
+
+export interface Improvement {
+  change_kind: string;
+  change_desc: string;
+  mistake_category: string | null;
+  before_metric: number | null;
+  after_metric: number | null;
+  adopted: boolean;
+}
+
 export type SourceStatus = "green" | "amber" | "red";
 
 export interface SourceHealthRow {

@@ -95,3 +95,26 @@ class IndiaCryptoTax:
     def total(self, gain: Decimal, transfer_notional: Decimal) -> Decimal:
         """Total tax drag entering net PnL."""
         return self.on_gain(gain) + self.tds(transfer_notional)
+
+
+# --- Live-fill slippage recalibration write-back (PRD FR-X4) ----------------
+# The post-mortem recalibrates slippage from real fills and writes the result
+# here; the live cost model then *reads* the empirical value instead of a stale
+# estimate. This only informs the cost model — it never relaxes a risk limit.
+
+_SLIPPAGE_CALIBRATION: dict[str, Decimal] = {}
+
+
+def set_slippage_calibration(venue: str, slippage_bps_value: Decimal) -> None:
+    """Record the empirically recalibrated slippage (bps) for ``venue`` (FR-X4)."""
+    _SLIPPAGE_CALIBRATION[venue] = slippage_bps_value
+
+
+def calibrated_slippage_bps(venue: str, fallback_bps: Decimal) -> Decimal:
+    """The recalibrated slippage for ``venue`` if one was written back, else the model fallback."""
+    return _SLIPPAGE_CALIBRATION.get(venue, fallback_bps)
+
+
+def clear_slippage_calibration() -> None:
+    """Drop all recalibrations (test isolation)."""
+    _SLIPPAGE_CALIBRATION.clear()

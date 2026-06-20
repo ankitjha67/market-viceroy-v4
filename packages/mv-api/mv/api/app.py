@@ -8,12 +8,14 @@ loop's components in production.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from mv.api.strategies import get_strategy, list_strategies
+from mv.api.ws import BroadcastHub
 from mv.journal.journal import Journal
 from mv.risk.kill_switch import KillSwitch
 
@@ -50,6 +52,11 @@ class ApiState:
     # Command Deck (Phase 8): portfolio summary + per-source health.
     portfolio_provider: Callable[[], dict[str, Any]] = field(default=dict)
     source_health_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
+    # Phase 9 screens: risk limits + exposures, journal search, read-only config.
+    risk_provider: Callable[[], dict[str, Any]] = field(default=dict)
+    settings_provider: Callable[[], dict[str, Any]] = field(default=dict)
+    # Phase 9 real-time: the loop publishes ticks/decisions/fills/health here.
+    hub: BroadcastHub = field(default_factory=BroadcastHub)
 
 
 def create_app(state: ApiState) -> FastAPI:
@@ -152,6 +159,56 @@ def create_app(state: ApiState) -> FastAPI:
     def source_health() -> list[dict[str, Any]]:
         """Per-source health: status / quota burn / latency / failover / reconcile."""
         return state.source_health_provider()
+
+    @app.get("/api/v1/risk/limits")
+    def risk_limits() -> dict[str, Any]:
+        """Risk Console: current hard limits + live exposures (Phase 9)."""
+        return state.risk_provider()
+
+    @app.get("/api/v1/journal")
+    def journal_search(
+        kind: str | None = None, q: str | None = None, limit: int = 200
+    ) -> list[dict[str, Any]]:
+        """Journal Explorer: filter the hash-chained journal by kind + text (Phase 9)."""
+        needle = q.lower() if q else None
+        rows: list[dict[str, Any]] = []
+        for entry in state.journal.entries():
+            if kind and entry.kind != kind:
+                continue
+            if needle and needle not in json.dumps(entry.payload).lower():
+                continue
+            rows.append(
+                {
+                    "seq": entry.seq,
+                    "kind": entry.kind,
+                    "ts": entry.ts.isoformat(),
+                    "payload": entry.payload,
+                }
+            )
+        return rows[-limit:]
+
+    @app.get("/api/v1/settings")
+    def settings() -> dict[str, Any]:
+        """Settings: read-only config (ladders, LLM routing, mode) — never secrets."""
+        return state.settings_provider()
+
+    @app.websocket("/ws/stream")
+    async def stream(websocket: WebSocket) -> None:
+        """Real-time fan-out of ticks / decisions / fills / source-health (Phase 9).
+
+        The UI subscribes for low-latency updates and falls back to REST polling
+        on disconnect — so this stream is an optimization, never the only path.
+        """
+        await websocket.accept()
+        queue = state.hub.subscribe()
+        try:
+            while True:
+                event = await queue.get()
+                await websocket.send_json(event)
+        except WebSocketDisconnect:
+            pass
+        finally:
+            state.hub.unsubscribe(queue)
 
     @app.get("/api/v1/positions")
     def positions() -> list[dict[str, Any]]:
