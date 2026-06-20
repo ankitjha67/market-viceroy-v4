@@ -15,6 +15,16 @@ anything.
 
 ## 0. The 60-second path (no keys, no Docker account needed)
 
+**Windows, one command** — the launcher does setup + infra + migrations, prompts
+you for each API key (Enter to skip), then gives a run menu. The only thing you
+type is keys:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\Start-MarketViceroy.ps1
+```
+
+Or do it by hand (any platform):
+
 ```bash
 uv sync --extra dev                 # install the workspace
 docker compose up -d                # Redis (+ Postgres, ClickHouse) — needed for the kill-switch
