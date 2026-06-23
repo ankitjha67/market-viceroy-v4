@@ -207,6 +207,16 @@ try {
     Write-Section 'Market Viceroy v4 -- operator launcher'
     Write-Host 'Paper-first. The agent never places a real-money order. Ctrl+C aborts.' -ForegroundColor DarkGray
 
+    # This launcher manages its own uv project venv. Clear any Python environment
+    # inherited from the parent terminal -- an activated venv, conda, or a stray
+    # (possibly quoted) UV_PYTHON / VIRTUAL_ENV -- so `uv run` always resolves THIS
+    # project's .venv. A quoted UV_PYTHON inherited from the terminal is exactly
+    # what produces a `No Python at '"C:\...python.exe'` failure on the run menu.
+    foreach ($poison in 'UV_PYTHON', 'VIRTUAL_ENV', 'PYTHONHOME', 'PYTHONPATH', 'CONDA_PREFIX', 'CONDA_DEFAULT_ENV') {
+        if (Test-Path "Env:$poison") { Remove-Item "Env:$poison" -ErrorAction SilentlyContinue }
+    }
+    $env:UV_LINK_MODE = 'copy'   # avoid cross-filesystem hardlink warnings
+
     if (-not (Test-Cmd 'uv')) {
         throw 'uv is not installed. Install it from https://docs.astral.sh/uv/ and re-run.'
     }
