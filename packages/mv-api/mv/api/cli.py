@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import sys
 from decimal import Decimal
-from typing import Any
+from typing import Any, TypedDict
 
 from mv.api.state import RedisKillSwitchState
 from mv.failover.db import redis_client
@@ -21,6 +21,18 @@ from mv.failover.settings import Settings
 from mv.journal.journal import Journal
 from mv.risk.kill_switch import KillSwitch
 from mv.risk.limits import RiskLimits
+
+
+class _ServeState(TypedDict):
+    """The mutable view the API's injected providers read each request.
+
+    The continuous ``mv-serve --watch`` loop swaps these in place every tick so
+    the polling UI sees fresh equity / positions / decisions without a restart.
+    """
+
+    portfolio: dict[str, Any]
+    positions: list[dict[str, Any]]
+    settings: dict[str, Any]
 
 
 def _kill_switch_for(
@@ -137,20 +149,25 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
 
 
 def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O + server wrapper
-    """Run one paper session over live bars, then serve the Command Deck API.
+    """Run paper sessions over live bars and serve the Command Deck API.
 
-    A single process: pull the latest real crypto bars through the failover
-    governor, run one paper session (``--agents`` selects the LangGraph pipeline,
-    else the deterministic ensemble), then serve ``mv-api`` over that session's
-    journal + computed P&L so the React UI (``packages/mv-ui``) renders real paper
-    data. Zero market keys (public crypto). Paper only — never a real-money order.
-    The kill-switch is reachable from the UI via the Operator token. Refresh the
-    view by restarting (each run is a fresh session over the latest window). The
-    displayed open-position entry is the average fill on that side (a paper
-    approximation); realized P&L is exact from closed round trips.
+    Pull the latest real crypto bars through the failover governor, run a paper
+    session (``--agents`` selects the LangGraph pipeline, else the deterministic
+    ensemble), and serve ``mv-api`` over the session's journal + computed P&L so
+    the React UI (``packages/mv-ui``) renders real paper data. Zero market keys
+    (public crypto). Paper only — never a real-money order.
+
+    With ``--watch`` it runs **continuously**: every ``--interval`` seconds it
+    re-runs over the most recent window of live bars and swaps the served
+    portfolio / positions / journal in place, so the polling UI and the logs keep
+    updating as new bars close (use a short ``--timeframe`` like ``1m`` to see it
+    move quickly). Realized P&L is exact from closed round trips; the displayed
+    open-position entry is the average fill on that side (a paper approximation).
     """
     import argparse
-    from collections import defaultdict
+    import threading
+    import time
+    from datetime import datetime
 
     import uvicorn
     from alphakit.strategies.trend.donchian_breakout_20 import DonchianBreakout20
@@ -159,17 +176,24 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     from mv.agents.baseline.runner import SignalStrategy
     from mv.api.app import ApiState, create_app
     from mv.api.paper_loop import run_paper_session
-    from mv.postmortem.trades import fill_from_journal, reconstruct_closed_trades
+    from mv.api.snapshot import portfolio_from_fills, positions_from_fills
+    from mv.postmortem.trades import fill_from_journal
     from mv.risk.engine import RiskEngine
     from nautilus_trader.test_kit.providers import TestInstrumentProvider
 
     parser = argparse.ArgumentParser(
-        prog="mv-serve", description="Run a paper session and serve the Command Deck API."
+        prog="mv-serve", description="Run paper sessions on live crypto bars and serve the API."
     )
     parser.add_argument("--symbol", default="BTC/USDT")
     parser.add_argument("--timeframe", default="1h")
     parser.add_argument("--limit", type=int, default=200, help="bars to pull from the governor")
     parser.add_argument("--agents", action="store_true", help="use the LangGraph agent pipeline")
+    parser.add_argument(
+        "--watch", action="store_true", help="re-run continuously as new bars close"
+    )
+    parser.add_argument(
+        "--interval", type=int, default=60, help="seconds between ticks in --watch mode"
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     ns = parser.parse_args(sys.argv[1:] if argv is None else argv)
@@ -183,102 +207,91 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     settings = Settings()
     registry = build_default_registry()
     router = DataSourceRouter(registry)
-    result = router.get_bars(CRYPTO_PRICES, ns.symbol, ns.timeframe, limit=ns.limit)
-
     kill = _kill_switch_for(settings, allow_in_memory=True)
     risk = RiskEngine(RiskLimits.aggressive(), kill)
-    journal = Journal()
     instrument = TestInstrumentProvider.btcusdt_binance()
     strategies: list[SignalStrategy] = [
         EMACross1226(long_only=True),
         SMACross1030(),
         DonchianBreakout20(),
     ]
-
     start_equity = Decimal("1000000")
-    engine = run_paper_session(
-        frame=result.frame,
-        symbol=ns.symbol,
-        timeframe=ns.timeframe,
-        strategies=strategies,
-        risk_engine=risk,
-        journal=journal,
-        instrument=instrument,
-        warmup=30,
-        starting_equity=start_equity,
-        use_agents=ns.agents,
-    )
-    engine.dispose()
+    mode = "agents" if ns.agents else "ensemble"
 
-    fills = [
-        fill_from_journal(e.payload, ts=e.ts) for e in journal.entries() if e.kind == "execution"
-    ]
-    realized = sum((t.net_pnl() for t in reconstruct_closed_trades(fills)), Decimal("0"))
-    equity = start_equity + realized
-
-    # Net open position + average entry per instrument, from the journaled fills.
-    # Each book entry is [filled_qty, filled_notional] on that side.
-    longs: dict[str, list[Decimal]] = defaultdict(lambda: [Decimal("0"), Decimal("0")])
-    shorts: dict[str, list[Decimal]] = defaultdict(lambda: [Decimal("0"), Decimal("0")])
-    marks: dict[str, Decimal] = {}
-    for f in fills:
-        book = longs if f.side == "BUY" else shorts
-        book[f.instrument][0] += f.qty
-        book[f.instrument][1] += f.qty * f.fill_price
-        marks[f.instrument] = f.fill_price
-
-    def positions_provider() -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        for sym in sorted(set(longs) | set(shorts)):
-            net = longs[sym][0] - shorts[sym][0]
-            if net == 0:
-                continue
-            side_book = longs[sym] if net > 0 else shorts[sym]
-            entry = side_book[1] / side_book[0] if side_book[0] else Decimal("0")
-            mark = marks.get(sym, entry)
-            pnl = (mark - entry) * net  # net carries the sign (long +, short -)
-            rows.append(
-                {
-                    "instrument": sym,
-                    "size": str(net),
-                    "entry": str(entry),
-                    "mark": str(mark),
-                    "pnl": str(pnl),
-                }
-            )
-        return rows
-
-    def portfolio_provider() -> dict[str, Any]:
-        return {
-            "equity": str(equity),
-            "day_pnl": str(realized),
-            "drawdown": "0",
-            "peak_equity": str(max(start_equity, equity)),
-        }
-
-    def settings_provider() -> dict[str, Any]:
-        return {
+    # The mutable view the injected providers read; the loop swaps it each tick.
+    view: _ServeState = {
+        "portfolio": portfolio_from_fills([], start_equity),
+        "positions": [],
+        "settings": {
             "mode": "paper",
-            "decision_engine": "agents" if ns.agents else "ensemble",
+            "decision_engine": mode,
             "symbol": ns.symbol,
             "timeframe": ns.timeframe,
-            "source": result.source,
-        }
-
+            "watch": bool(ns.watch),
+            "interval_seconds": ns.interval,
+            "source": "",
+        },
+    }
     state = ApiState(
         kill_switch=kill,
-        journal=journal,
+        journal=Journal(),
         operator_token=token,
-        positions_provider=positions_provider,
-        portfolio_provider=portfolio_provider,
-        settings_provider=settings_provider,
+        positions_provider=lambda: view["positions"],
+        portfolio_provider=lambda: view["portfolio"],
+        settings_provider=lambda: view["settings"],
     )
-    decisions = sum(1 for e in journal.entries() if e.kind == "decision")
-    mode = "agents" if ns.agents else "ensemble"
-    print(
-        f"[serve] {ns.symbol} {ns.timeframe} via {result.source} ({mode}): "
-        f"{decisions} decisions, {len(fills)} fills, realized P&L {realized}"
-    )
+
+    def run_tick() -> None:
+        """One paper session over the latest window; swap the served view + journal."""
+        result = router.get_bars(CRYPTO_PRICES, ns.symbol, ns.timeframe, limit=ns.limit)
+        journal = Journal()
+        engine = run_paper_session(
+            frame=result.frame,
+            symbol=ns.symbol,
+            timeframe=ns.timeframe,
+            strategies=strategies,
+            risk_engine=risk,
+            journal=journal,
+            instrument=instrument,
+            warmup=30,
+            starting_equity=start_equity,
+            use_agents=ns.agents,
+        )
+        engine.dispose()
+        fills = [
+            fill_from_journal(e.payload, ts=e.ts)
+            for e in journal.entries()
+            if e.kind == "execution"
+        ]
+        view["portfolio"] = portfolio_from_fills(fills, start_equity)
+        view["positions"] = positions_from_fills(fills)
+        view["settings"] = {**view["settings"], "source": result.source}
+        state.journal = journal  # atomic swap; request handlers read the latest
+        decisions = sum(1 for e in journal.entries() if e.kind == "decision")
+        stamp = datetime.now().strftime("%H:%M:%S")
+        print(
+            f"[serve {stamp}] {ns.symbol} {ns.timeframe} via {result.source} ({mode}): "
+            f"{decisions} decisions, {len(fills)} fills, equity {view['portfolio']['equity']}"
+        )
+
+    run_tick()  # populate before serving
+
+    if ns.watch:
+
+        def watch_loop() -> None:
+            while True:
+                time.sleep(ns.interval)
+                if kill.is_tripped():
+                    print("[serve] kill-switch tripped; watch loop paused until reset")
+                    continue
+                try:
+                    run_tick()
+                except Exception as exc:  # one bad tick must not kill the server
+                    print(f"[serve] tick error: {type(exc).__name__}: {exc}")
+
+        threading.Thread(target=watch_loop, daemon=True).start()
+        print(f"[serve] watch mode: re-running every {ns.interval}s as new bars close")
+
     print(f"[serve] Command Deck API -> http://{ns.host}:{ns.port}/api/v1/health")
     print(
         f"[serve] start the UI: cd packages/mv-ui && npm install && "

@@ -160,12 +160,16 @@ One command runs a paper session and serves the API the React UI reads:
 
 ```bash
 export MV_OPERATOR_TOKEN=your-long-random-secret   # PowerShell: $env:MV_OPERATOR_TOKEN='...'
-uv run mv-serve                                     # or: mv-serve --agents
+uv run mv-serve --watch --interval 60 --timeframe 1m   # continuous; or plain `mv-serve` for one-shot
 ```
 
 `mv-serve` runs a paper session (§3/§4), then serves the Command Deck API on
 `http://127.0.0.1:8000` with the session's journal, computed equity/P&L, and open
-positions. Then start the front end:
+positions. **With `--watch` it stays live**: every `--interval` seconds it re-runs
+over the most recent window of bars and swaps the served data in place, so the
+deck's equity/positions/decisions and the server logs keep updating as new bars
+close (a short `--timeframe` like `1m` moves visibly each minute). Then start the
+front end:
 
 ```bash
 cd packages/mv-ui
@@ -180,9 +184,11 @@ other screens — Agent Room, Strategy Lab, Post-Mortem Room, Arbitrage, Risk
 Console, Journal Explorer, Source Health, Settings — read the same API.
 
 Notes:
-- Each `mv-serve` is one session over the latest window; **restart it to refresh**
-  the data. (A continuous live-updating daemon is a follow-on; the deterministic
-  strategies make a fixed window reproducible.)
+- **`--watch` keeps it live** — equity, positions, decisions, and logs update each
+  interval as new bars close (the polling UI picks them up automatically). Without
+  `--watch`, `mv-serve` serves one session over the latest window; restart it to
+  refresh. Each tick re-runs over the most recent window, so equity reflects that
+  rolling window rather than a single anchored start.
 - The displayed position *entry* is the average fill on that side (a paper
   approximation); **realized P&L is exact** from closed round trips.
 - `MV_OPERATOR_TOKEN` must be set or `mv-serve` refuses to start (it guards the
