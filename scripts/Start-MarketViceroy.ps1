@@ -251,7 +251,9 @@ try {
             }
         }
         else {
-            Write-Warning 'Docker not found. Skipping infra + migrations. mv-paper / mv-serve need Redis (docker compose up -d).'
+            Write-Warning 'Docker not found. Skipping infra + migrations.'
+            Write-Host '  Paper trading still works (zero-infra: an in-process kill-switch).' -ForegroundColor DarkGray
+            Write-Host '  Install Docker Desktop for the shared kill-switch, journal persistence, and the full stack.' -ForegroundColor DarkGray
         }
     }
 

@@ -23,12 +23,45 @@ from mv.risk.kill_switch import KillSwitch
 from mv.risk.limits import RiskLimits
 
 
+def _kill_switch_for(
+    settings: Settings, *, allow_in_memory: bool
+) -> KillSwitch:  # pragma: no cover - I/O wrapper
+    """Build the kill-switch, preferring the shared Redis flag.
+
+    Paper trading needs no infra except this shared flag. When Redis is reachable
+    we use it, so a separate ``mv-kill`` halts a running loop. When it is not
+    (e.g. no Docker) and ``allow_in_memory`` is set, fall back to a process-local
+    switch so paper trading still runs — with a warning that a cross-process
+    ``mv-kill`` won't reach this run (the inviolable in-process veto still holds;
+    the UI's kill button, served in the same process, still works). For
+    ``mv-kill`` itself a process-local switch would be meaningless, so we exit
+    with guidance instead.
+    """
+    try:
+        client = redis_client(settings)
+        client.ping()
+        return KillSwitch(RedisKillSwitchState(client))
+    except Exception as exc:  # any Redis failure -> in-memory fallback or guidance
+        if not allow_in_memory:
+            raise SystemExit(
+                f"Redis is not reachable ({type(exc).__name__}). Start it with "
+                "`docker compose up -d`, or trip the kill-switch from the Command "
+                "Deck UI (zero-infra paper runs use a per-process switch)."
+            ) from exc
+        print(
+            f"[warn] Redis unavailable ({type(exc).__name__}); using an in-process "
+            "kill-switch. A separate `mv-kill` won't reach this run. Start Docker "
+            "(docker compose up -d) for the shared switch + the full stack."
+        )
+        return KillSwitch()
+
+
 def kill_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O wrapper
     """Trip the global kill-switch (Operator)."""
     args = sys.argv[1:] if argv is None else argv
     reason = args[0] if args else "operator kill-switch via CLI"
     settings = Settings()
-    kill = KillSwitch(RedisKillSwitchState(redis_client(settings)))
+    kill = _kill_switch_for(settings, allow_in_memory=False)
     event = kill.trip(reason=reason)
     print(f"[kill-switch] {event.action}: {event.reason}")
 
@@ -64,7 +97,7 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     router = DataSourceRouter(registry)
     result = router.get_bars(CRYPTO_PRICES, ns.symbol, ns.timeframe, limit=ns.limit)
 
-    kill = KillSwitch(RedisKillSwitchState(redis_client(settings)))
+    kill = _kill_switch_for(settings, allow_in_memory=True)
     risk = RiskEngine(RiskLimits.aggressive(), kill)
     journal = Journal()
     instrument = TestInstrumentProvider.btcusdt_binance()
@@ -152,7 +185,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     router = DataSourceRouter(registry)
     result = router.get_bars(CRYPTO_PRICES, ns.symbol, ns.timeframe, limit=ns.limit)
 
-    kill = KillSwitch(RedisKillSwitchState(redis_client(settings)))
+    kill = _kill_switch_for(settings, allow_in_memory=True)
     risk = RiskEngine(RiskLimits.aggressive(), kill)
     journal = Journal()
     instrument = TestInstrumentProvider.btcusdt_binance()
