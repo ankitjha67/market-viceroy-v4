@@ -58,10 +58,13 @@ uv run mypy --strict packages/   # types
 uv run pytest -q             # full suite (≥85% coverage gate)
 ```
 
-Redis is the only infra `mv-paper`/`mv-serve` strictly need (the kill-switch
-lives there). Postgres is needed for migrations and the integration tests;
-ClickHouse for the feature-store round-trips. If Docker isn't running you'll get
-a Redis connection error from `mv-paper` — start `docker compose up -d` first.
+**Docker is optional for paper trading.** `mv-paper`/`mv-serve` run with zero
+infra: if Redis is unreachable they print a warning and fall back to an
+in-process kill-switch (the inviolable in-process veto still holds; the UI's kill
+button still works; only a separate `mv-kill` from another terminal can't reach
+the run). Docker adds the **shared** kill-switch, journal/gate **persistence**
+(Postgres via `mv-migrate`), and the ClickHouse feature store. Start it with
+`docker compose up -d` when you want the full stack.
 
 ---
 
@@ -336,7 +339,9 @@ the gate and your sign-off.
 
 ## 14. Troubleshooting
 
-- **`mv-paper` errors on Redis** → `docker compose up -d` (Redis must be up).
+- **`mv-paper` warns "Redis unavailable"** → harmless; it falls back to an
+  in-process kill-switch and runs. Start Docker (`docker compose up -d`) only if
+  you want the shared kill-switch + persistence.
 - **`mv-serve` exits "set MV_OPERATOR_TOKEN"** → export the token first (§5).
 - **UI shows empty / network error** → confirm `mv-serve` is up on the port and
   `NEXT_PUBLIC_API_URL` matches it; CORS allows `MV_UI_ORIGIN` (default
