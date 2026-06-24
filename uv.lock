@@ -2776,6 +2776,7 @@ dependencies = [
     { name = "mv-risk" },
     { name = "nautilus-trader" },
     { name = "pandas" },
+    { name = "polars" },
     { name = "pydantic" },
     { name = "uvicorn" },
 ]
@@ -2792,6 +2793,7 @@ requires-dist = [
     { name = "mv-risk", editable = "packages/mv-risk" },
     { name = "nautilus-trader", specifier = "==1.228.0" },
     { name = "pandas", specifier = ">=2.2" },
+    { name = "polars", specifier = ">=1.0" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "uvicorn", specifier = ">=0.30" },
 ]
