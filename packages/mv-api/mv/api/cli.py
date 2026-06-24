@@ -191,6 +191,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     from mv.api.app import ApiState, create_app
     from mv.api.bars import merge_bars
     from mv.api.fx import scale_prices, usd_inr_rate
+    from mv.api.learning import mistakes_from_fills
     from mv.api.paper_loop import run_paper_session
     from mv.api.snapshot import portfolio_from_fills, positions_from_fills
     from mv.postmortem.trades import fill_from_journal
@@ -295,6 +296,15 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             }
         ]
 
+    def mistakes_view() -> dict[str, Any]:
+        # Live mistake taxonomy over the current journal's closed trades (FR-P2).
+        fills = [
+            fill_from_journal(e.payload, ts=e.ts)
+            for e in state.journal.entries()
+            if e.kind == "execution"
+        ]
+        return mistakes_from_fills(fills)
+
     state = ApiState(
         kill_switch=kill,
         journal=Journal(),
@@ -304,6 +314,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         portfolio_history_provider=lambda: history,
         risk_provider=risk_view,
         source_health_provider=source_health_view,
+        mistakes_provider=mistakes_view,
         settings_provider=lambda: view["settings"],
     )
 

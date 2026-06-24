@@ -1,6 +1,7 @@
 "use client";
 
 import { useImprovements, useMistakes } from "@/lib/hooks";
+import { formatMoney } from "@/lib/format";
 import { StatePanel } from "./StatePanel";
 import styles from "./screen.module.css";
 
@@ -30,7 +31,7 @@ export function PostMortemRoom() {
                 <tr key={category}>
                   <td className="mono">{category}</td>
                   <td className={`${styles.num} mono`}>{stat.count}</td>
-                  <td className={`${styles.num} mono neg`}>{stat.cost}</td>
+                  <td className={`${styles.num} mono neg`}>{formatMoney(stat.cost)}</td>
                 </tr>
               ))}
             </tbody>
