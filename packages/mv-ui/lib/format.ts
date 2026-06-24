@@ -1,10 +1,11 @@
 /** Display formatting only. Money arrives as Decimal strings from the API; we
  * parse to a number for *display* (never for accounting) and format per currency. */
 
-export function formatMoney(value: string, currency = "USD"): string {
+export function formatMoney(value: string, currency = "INR"): string {
   const n = Number(value);
   if (!Number.isFinite(n)) return value;
-  return new Intl.NumberFormat("en-US", {
+  const locale = currency === "INR" ? "en-IN" : "en-US";
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
     maximumFractionDigits: 2,

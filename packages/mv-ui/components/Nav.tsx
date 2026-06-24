@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import styles from "./Nav.module.css";
 
 const LINKS: ReadonlyArray<{ href: string; label: string }> = [
-  { href: "/", label: "Command Deck" },
+  { href: "/", label: "Live Dashboard" },
   { href: "/agents", label: "Agent Room" },
   { href: "/strategies", label: "Strategy Lab" },
   { href: "/postmortem", label: "Post-Mortem Room" },

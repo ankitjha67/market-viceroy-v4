@@ -1,0 +1,260 @@
+"use client";
+
+import type { ReactNode } from "react";
+import Link from "next/link";
+import {
+  useDecisions,
+  useHealth,
+  useHistory,
+  useImprovements,
+  useMistakes,
+  usePortfolio,
+  usePositions,
+  useRiskLimits,
+  useSettings,
+  useSourceHealth,
+  useStrategies,
+} from "@/lib/hooks";
+import { formatMoney, formatPct, formatTime, signClass } from "@/lib/format";
+import { StatePanel } from "./StatePanel";
+import { KillSwitch } from "./KillSwitch";
+import { EquityChart } from "./EquityChart";
+import styles from "./LiveDashboard.module.css";
+
+/**
+ * The unified live dashboard (the home screen): everything in one place — equity
+ * curve, P&L, Buy/Sell/Hold, positions, models/strategies, risk, learning, source
+ * health — each tile drilling down into its detailed screen. Values are INR; the
+ * polling hooks keep it updating continuously while the loop runs.
+ */
+export function LiveDashboard() {
+  const health = useHealth();
+  const portfolio = usePortfolio();
+  const history = useHistory();
+  const positions = usePositions();
+  const decisions = useDecisions();
+  const sources = useSourceHealth();
+  const strategies = useStrategies();
+  const risk = useRiskLimits();
+  const mistakes = useMistakes();
+  const improvements = useImprovements();
+  const settings = useSettings();
+
+  const p = portfolio.data;
+  const s = settings.data ?? {};
+  const ddSeverity = p ? Math.min(1, Number(p.drawdown) / 0.2) : 0;
+  const engine = String(s.decision_engine ?? "ensemble");
+  const symbol = String(s.symbol ?? "—");
+  const timeframe = String(s.timeframe ?? "—");
+  const fx = s.fx_usd_inr ? `₹${String(s.fx_usd_inr)}/USD` : "";
+
+  const active = strategies.data?.filter((x) => x.gate_status === "active").length ?? 0;
+  const observe = strategies.data?.filter((x) => x.gate_status === "observe").length ?? 0;
+
+  return (
+    <div className={styles.page}>
+      <header className={styles.head}>
+        <div>
+          <h1>Command Deck</h1>
+          <p className={styles.sub}>The fund in a glass box — live, paper, INR.</p>
+          <div className={styles.modeStrip}>
+            <span>paper</span>
+            <span>{engine}</span>
+            <span className="mono">{symbol}</span>
+            <span className="mono">{timeframe}</span>
+            {fx && <span className="mono">{fx}</span>}
+          </div>
+        </div>
+        <KillSwitch tripped={health.data?.kill_switch_tripped ?? false} />
+      </header>
+
+      <section className={styles.stats} aria-label="Portfolio summary">
+        <StatePanel state={portfolio.state} error="Portfolio summary unavailable." emptyMessage="No portfolio yet.">
+          <Stat label="Equity" value={p ? formatMoney(p.equity) : ""} />
+          <Stat label="Day P&L" value={p ? formatMoney(p.day_pnl) : ""} sign={p?.day_pnl} />
+          <div className={styles.gaugeWrap}>
+            <div className={styles.statLabel}>Drawdown</div>
+            <div className={`${styles.statValue} mono`}>{p ? formatPct(p.drawdown) : ""}</div>
+            <DrawdownGauge severity={ddSeverity} />
+          </div>
+        </StatePanel>
+      </section>
+
+      <section className={styles.panel} aria-label="Equity curve">
+        <h2 className={styles.panelTitle}>Equity curve</h2>
+        <StatePanel
+          state={history.state}
+          error="Equity history unavailable."
+          emptyMessage="Waiting for the first tick…"
+        >
+          <EquityChart points={history.data ?? []} />
+        </StatePanel>
+      </section>
+
+      <div className={styles.grid}>
+        <section className={styles.panel}>
+          <h2 className={styles.panelTitle}>Open positions</h2>
+          <StatePanel
+            state={positions.state}
+            error="Positions feed unavailable."
+            emptyMessage={`No positions; ${decisions.data?.length ?? 0} decisions, paper mode.`}
+          >
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Instrument</th>
+                  <th className={styles.num}>Size</th>
+                  <th className={styles.num}>Entry</th>
+                  <th className={styles.num}>Mark</th>
+                  <th className={styles.num}>P&L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {positions.data?.map((pos) => (
+                  <tr key={pos.instrument}>
+                    <td>{pos.instrument}</td>
+                    <td className={`${styles.num} mono`}>{pos.size}</td>
+                    <td className={`${styles.num} mono`}>{formatMoney(pos.entry)}</td>
+                    <td className={`${styles.num} mono`}>{formatMoney(pos.mark)}</td>
+                    <td className={`${styles.num} mono ${signClass(pos.pnl)}`}>{formatMoney(pos.pnl)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </StatePanel>
+        </section>
+
+        <section className={styles.panel}>
+          <TileTitle href="/agents">Buy / Sell / Hold</TileTitle>
+          <StatePanel state={decisions.state} error="Decision feed unavailable." emptyMessage="No decisions yet.">
+            <ul className={styles.feed}>
+              {decisions.data
+                ?.slice()
+                .reverse()
+                .slice(0, 8)
+                .map((d) => (
+                  <li key={d.seq} className={styles.feedItem}>
+                    <span className={`${styles.action} ${styles[d.payload.action ?? "HOLD"]}`}>
+                      {d.payload.action ?? "HOLD"}
+                    </span>
+                    <span className={styles.instrument}>{d.payload.instrument ?? "—"}</span>
+                    <span className={styles.rationale}>{d.payload.rationale ?? ""}</span>
+                    {d.payload.snapshot_id && (
+                      <Link
+                        className={styles.link}
+                        href={`/agents?s=${encodeURIComponent(d.payload.snapshot_id)}`}
+                      >
+                        pipeline →
+                      </Link>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          </StatePanel>
+        </section>
+      </div>
+
+      <div className={styles.grid}>
+        <section className={styles.panel}>
+          <TileTitle href="/strategies">Models &amp; strategies</TileTitle>
+          <StatePanel state={strategies.state} error="Strategy catalog unavailable." emptyMessage="No strategies yet.">
+            <p className={styles.note}>
+              Decision engine: <strong>{engine}</strong>. <strong>{active}</strong> active ·{" "}
+              <strong>{observe}</strong> observing of {strategies.data?.length ?? 0}.
+            </p>
+            <ul className={styles.chips}>
+              {strategies.data?.slice(0, 8).map((x) => (
+                <li key={x.slug} className={styles.chip} data-gate={x.gate_status}>
+                  {x.slug}
+                </li>
+              ))}
+            </ul>
+          </StatePanel>
+        </section>
+
+        <section className={styles.panel}>
+          <TileTitle href="/risk">Risk &amp; exposure</TileTitle>
+          <StatePanel state={risk.state} error="Risk limits unavailable." emptyMessage="No limits reported.">
+            <ul className={styles.kv}>
+              {Object.entries(risk.data ?? {})
+                .slice(0, 6)
+                .map(([k, v]) => (
+                  <li key={k}>
+                    <span>{k}</span>
+                    <span className="mono">{String(v)}</span>
+                  </li>
+                ))}
+            </ul>
+          </StatePanel>
+        </section>
+      </div>
+
+      <div className={styles.grid}>
+        <section className={styles.panel}>
+          <TileTitle href="/postmortem">Learning</TileTitle>
+          <StatePanel
+            state={improvements.state}
+            error="Post-mortem unavailable."
+            emptyMessage="No improvements proposed yet."
+          >
+            <p className={styles.note}>
+              {Object.keys(mistakes.data ?? {}).length} mistake categories ·{" "}
+              {improvements.data?.length ?? 0} improvement proposals (propose-only).
+            </p>
+          </StatePanel>
+        </section>
+
+        <section className={styles.panel}>
+          <TileTitle href="/health">Source health</TileTitle>
+          <StatePanel state={sources.state} error="Source health unavailable." emptyMessage="No sources reporting.">
+            <ul className={styles.sourceRow}>
+              {sources.data?.map((src) => (
+                <li key={src.source} className={styles.sourceChip}>
+                  <span className={styles.dot} data-status={src.status} aria-hidden="true" />
+                  <span>{src.source}</span>
+                  {src.last_failover && (
+                    <span className={styles.failover} title={formatTime(src.last_failover)}>
+                      failover
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </StatePanel>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function TileTitle({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <div className={styles.tileHead}>
+      <h2 className={styles.panelTitle}>{children}</h2>
+      <Link className={styles.drill} href={href}>
+        open →
+      </Link>
+    </div>
+  );
+}
+
+function Stat({ label, value, sign }: { label: string; value: string; sign?: string }) {
+  return (
+    <div className={styles.stat}>
+      <div className={styles.statLabel}>{label}</div>
+      <div className={`${styles.statValue} mono ${sign ? signClass(sign) : ""}`}>{value}</div>
+    </div>
+  );
+}
+
+function DrawdownGauge({ severity }: { severity: number }) {
+  const width = Math.max(0, Math.min(1, severity)) * 100;
+  const color =
+    severity > 0.75 ? "var(--status-red)" : severity > 0.4 ? "var(--status-amber)" : "var(--status-green)";
+  return (
+    <svg viewBox="0 0 100 8" className={styles.gauge} role="img" aria-label="Drawdown vs breaker">
+      <rect x="0" y="2" width="100" height="4" rx="2" fill="var(--surface-sunk)" />
+      <rect x="0" y="2" width={width} height="4" rx="2" fill={color} />
+    </svg>
+  );
+}

@@ -40,6 +40,11 @@ describe("format", () => {
   it("formats money strings without float drift in accounting", () => {
     expect(formatMoney("1000000", "USD")).toContain("1,000,000");
   });
+  it("defaults to INR (₹) with Indian digit grouping", () => {
+    const out = formatMoney("500000"); // 5,00,000 in en-IN grouping
+    expect(out).toContain("₹");
+    expect(out).toContain("5,00,000");
+  });
   it("formats percentages", () => {
     expect(formatPct("0.1234")).toBe("12.34%");
   });
