@@ -245,6 +245,9 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     history: list[dict[str, Any]] = []
     working_frame: pl.DataFrame | None = None
 
+    limits = risk.limits
+    live_strategies = "ema_cross_12_26, sma_cross_10_30, donchian_breakout_20"
+
     # The mutable view the injected providers read; the loop swaps it each tick.
     view: _ServeState = {
         "portfolio": portfolio_from_fills([], start_equity),
@@ -252,6 +255,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         "settings": {
             "mode": "paper",
             "decision_engine": mode,
+            "live_strategies": live_strategies,
             "symbol": ns.symbol,
             "timeframe": ns.timeframe,
             "currency": "INR",
@@ -261,6 +265,36 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             "source": "",
         },
     }
+
+    def risk_view() -> dict[str, Any]:
+        return {
+            "max_position_pct": str(limits.max_position_pct),
+            "daily_loss_limit_pct": str(limits.daily_loss_limit_pct),
+            "max_drawdown_pct": str(limits.max_drawdown_pct),
+            "gross_exposure_cap": str(limits.gross_exposure_cap),
+            "net_exposure_cap": str(limits.net_exposure_cap),
+            "concentration_pct": str(limits.concentration_pct),
+            "kelly_fraction_cap": str(limits.kelly_fraction_cap),
+            "kill_switch": "tripped" if kill.is_tripped() else "armed",
+        }
+
+    def source_health_view() -> list[dict[str, Any]]:
+        src = str(view["settings"].get("source") or "")
+        if not src:
+            return []
+        return [
+            {
+                "source": src,
+                "domain": "crypto.prices",
+                "status": "green",
+                "quota_burn_pct": 0,
+                "latency_p50_ms": 0,
+                "latency_p95_ms": 0,
+                "last_failover": None,
+                "reconcile_flag": False,
+            }
+        ]
+
     state = ApiState(
         kill_switch=kill,
         journal=Journal(),
@@ -268,6 +302,8 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         positions_provider=lambda: view["positions"],
         portfolio_provider=lambda: view["portfolio"],
         portfolio_history_provider=lambda: history,
+        risk_provider=risk_view,
+        source_health_provider=source_health_view,
         settings_provider=lambda: view["settings"],
     )
 
