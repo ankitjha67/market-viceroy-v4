@@ -159,8 +159,12 @@ export function LiveDashboard() {
           <TileTitle href="/strategies">Models &amp; strategies</TileTitle>
           <StatePanel state={strategies.state} error="Strategy catalog unavailable." emptyMessage="No strategies yet.">
             <p className={styles.note}>
-              Decision engine: <strong>{engine}</strong>. <strong>{active}</strong> active ·{" "}
-              <strong>{observe}</strong> observing of {strategies.data?.length ?? 0}.
+              Decision engine: <strong>{engine}</strong> — trading{" "}
+              <strong>{String(s.live_strategies ?? "—")}</strong>.
+            </p>
+            <p className={styles.note}>
+              Catalog: <strong>{active}</strong> gate-active · <strong>{observe}</strong> observing of{" "}
+              {strategies.data?.length ?? 0}.
             </p>
             <ul className={styles.chips}>
               {strategies.data?.slice(0, 8).map((x) => (

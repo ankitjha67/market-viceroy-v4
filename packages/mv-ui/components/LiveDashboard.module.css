@@ -70,6 +70,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-8);
+  align-items: start; /* size each tile to its content (no stretch / dangling tables) */
 }
 @media (max-width: 980px) {
   .grid,

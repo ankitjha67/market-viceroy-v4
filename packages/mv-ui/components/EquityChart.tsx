@@ -28,6 +28,7 @@ export function EquityChart({ points }: { points: HistoryPoint[] }) {
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: "#5a564e",
+        attributionLogo: false,
       },
       grid: { horzLines: { color: "#e7e2d8" }, vertLines: { visible: false } },
       rightPriceScale: { borderVisible: false },
@@ -41,6 +42,7 @@ export function EquityChart({ points }: { points: HistoryPoint[] }) {
       bottomColor: "rgba(122, 45, 31, 0.02)",
       lineWidth: 2,
       priceLineVisible: false,
+      lastValueVisible: false,
     });
     chartRef.current = chart;
     seriesRef.current = series;
