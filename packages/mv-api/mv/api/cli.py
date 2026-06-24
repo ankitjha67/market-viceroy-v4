@@ -86,13 +86,14 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     from alphakit.strategies.trend.ema_cross_12_26 import EMACross1226
     from alphakit.strategies.trend.sma_cross_10_30 import SMACross1030
     from mv.agents.baseline.runner import SignalStrategy
+    from mv.api.fx import scale_prices, usd_inr_rate
     from mv.api.paper_loop import run_paper_session
     from mv.postmortem.trades import fill_from_journal, reconstruct_closed_trades
     from mv.risk.engine import RiskEngine
     from nautilus_trader.test_kit.providers import TestInstrumentProvider
 
     parser = argparse.ArgumentParser(
-        prog="mv-paper", description="Run one paper session on live crypto bars."
+        prog="mv-paper", description="Run one paper session on live crypto bars (values in INR)."
     )
     parser.add_argument("--symbol", default="BTC/USDT")
     parser.add_argument("--timeframe", default="1h")
@@ -108,6 +109,8 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     registry = build_default_registry()
     router = DataSourceRouter(registry)
     result = router.get_bars(CRYPTO_PRICES, ns.symbol, ns.timeframe, limit=ns.limit)
+    fx_rate = usd_inr_rate(router)  # live USD->INR; the whole session runs in INR
+    frame_inr = scale_prices(result.frame, fx_rate)
 
     kill = _kill_switch_for(settings, allow_in_memory=True)
     risk = RiskEngine(RiskLimits.aggressive(), kill)
@@ -119,9 +122,9 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         DonchianBreakout20(),
     ]
 
-    start_equity = Decimal("1000000")
+    start_equity = Decimal("5000")  # INR
     engine = run_paper_session(
-        frame=result.frame,
+        frame=frame_inr,
         symbol=ns.symbol,
         timeframe=ns.timeframe,
         strategies=strategies,
@@ -139,11 +142,11 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     realized = sum((t.net_pnl() for t in reconstruct_closed_trades(fills)), Decimal("0"))
     mode = "agents" if ns.agents else "ensemble"
     print(
-        f"[paper] {ns.symbol} {ns.timeframe} via {result.source} ({mode}): "
+        f"[paper] {ns.symbol} {ns.timeframe} via {result.source} ({mode}, INR @ ₹{fx_rate}/USD): "
         f"{decisions} decisions, {len(fills)} fills, {len(engine.cache.positions())} open positions"
     )
     print(
-        f"[paper]   realized P&L (closed trades): {realized}  |  equity ~ {start_equity + realized}"
+        f"[paper]   realized P&L (closed trades): ₹{realized}  |  equity ~ ₹{start_equity + realized}"
     )
     engine.dispose()
 
@@ -167,14 +170,17 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     import argparse
     import threading
     import time
-    from datetime import datetime
+    from datetime import datetime, timezone
 
+    import polars as pl
     import uvicorn
     from alphakit.strategies.trend.donchian_breakout_20 import DonchianBreakout20
     from alphakit.strategies.trend.ema_cross_12_26 import EMACross1226
     from alphakit.strategies.trend.sma_cross_10_30 import SMACross1030
     from mv.agents.baseline.runner import SignalStrategy
     from mv.api.app import ApiState, create_app
+    from mv.api.bars import merge_bars
+    from mv.api.fx import scale_prices, usd_inr_rate
     from mv.api.paper_loop import run_paper_session
     from mv.api.snapshot import portfolio_from_fills, positions_from_fills
     from mv.postmortem.trades import fill_from_journal
@@ -193,6 +199,9 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     )
     parser.add_argument(
         "--interval", type=int, default=60, help="seconds between ticks in --watch mode"
+    )
+    parser.add_argument(
+        "--max-bars", type=int, default=2000, help="cap on the growing window / history (--watch)"
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
@@ -215,8 +224,14 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         SMACross1030(),
         DonchianBreakout20(),
     ]
-    start_equity = Decimal("1000000")
+    start_equity = Decimal("5000")  # INR
     mode = "agents" if ns.agents else "ensemble"
+    fx_rate = usd_inr_rate(router)  # live USD->INR via the FX governor; fixed fallback offline
+
+    # Time series for the live equity curve, and the growing bar window (anchored
+    # at launch) so equity accumulates from ₹5000 as new bars close.
+    history: list[dict[str, Any]] = []
+    working_frame: pl.DataFrame | None = None
 
     # The mutable view the injected providers read; the loop swaps it each tick.
     view: _ServeState = {
@@ -227,6 +242,8 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             "decision_engine": mode,
             "symbol": ns.symbol,
             "timeframe": ns.timeframe,
+            "currency": "INR",
+            "fx_usd_inr": str(fx_rate),
             "watch": bool(ns.watch),
             "interval_seconds": ns.interval,
             "source": "",
@@ -238,15 +255,23 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         operator_token=token,
         positions_provider=lambda: view["positions"],
         portfolio_provider=lambda: view["portfolio"],
+        portfolio_history_provider=lambda: history,
         settings_provider=lambda: view["settings"],
     )
 
     def run_tick() -> None:
-        """One paper session over the latest window; swap the served view + journal."""
-        result = router.get_bars(CRYPTO_PRICES, ns.symbol, ns.timeframe, limit=ns.limit)
+        """Grow the window with the latest bars, run a paper session in INR, swap the view."""
+        nonlocal working_frame
+        fresh = router.get_bars(CRYPTO_PRICES, ns.symbol, ns.timeframe, limit=ns.limit)
+        working_frame = (
+            fresh.frame
+            if working_frame is None
+            else merge_bars(working_frame, fresh.frame, max_bars=ns.max_bars)
+        )
+        frame_inr = scale_prices(working_frame, fx_rate)
         journal = Journal()
         engine = run_paper_session(
-            frame=result.frame,
+            frame=frame_inr,
             symbol=ns.symbol,
             timeframe=ns.timeframe,
             strategies=strategies,
@@ -263,15 +288,29 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             for e in journal.entries()
             if e.kind == "execution"
         ]
-        view["portfolio"] = portfolio_from_fills(fills, start_equity)
-        view["positions"] = positions_from_fills(fills)
-        view["settings"] = {**view["settings"], "source": result.source}
-        state.journal = journal  # atomic swap; request handlers read the latest
+        portfolio = portfolio_from_fills(fills, start_equity)
+        positions = positions_from_fills(fills)
         decisions = sum(1 for e in journal.entries() if e.kind == "decision")
-        stamp = datetime.now().strftime("%H:%M:%S")
+        view["portfolio"] = portfolio
+        view["positions"] = positions
+        view["settings"] = {**view["settings"], "source": fresh.source}
+        state.journal = journal  # atomic swap; request handlers read the latest
+        stamp = datetime.now(timezone.utc)
+        history.append(
+            {
+                "ts": stamp.isoformat(),
+                "equity": portfolio["equity"],
+                "day_pnl": portfolio["day_pnl"],
+                "decisions": decisions,
+                "fills": len(fills),
+                "open_positions": len(positions),
+            }
+        )
+        if len(history) > ns.max_bars:
+            del history[: len(history) - ns.max_bars]
         print(
-            f"[serve {stamp}] {ns.symbol} {ns.timeframe} via {result.source} ({mode}): "
-            f"{decisions} decisions, {len(fills)} fills, equity {view['portfolio']['equity']}"
+            f"[serve {stamp:%H:%M:%S}] {ns.symbol} {ns.timeframe} via {fresh.source} ({mode}): "
+            f"{decisions} decisions, {len(fills)} fills, equity ₹{portfolio['equity']}"
         )
 
     run_tick()  # populate before serving
@@ -279,20 +318,28 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     if ns.watch:
 
         def watch_loop() -> None:
+            nonlocal fx_rate
+            ticks = 0
             while True:
                 time.sleep(ns.interval)
                 if kill.is_tripped():
                     print("[serve] kill-switch tripped; watch loop paused until reset")
                     continue
                 try:
+                    ticks += 1
+                    if ticks % 30 == 0:  # refresh the (daily) FX rate periodically
+                        fx_rate = usd_inr_rate(router)
                     run_tick()
                 except Exception as exc:  # one bad tick must not kill the server
                     print(f"[serve] tick error: {type(exc).__name__}: {exc}")
 
         threading.Thread(target=watch_loop, daemon=True).start()
-        print(f"[serve] watch mode: re-running every {ns.interval}s as new bars close")
+        print(f"[serve] watch mode: re-running every {ns.interval}s; window grows as bars close")
 
-    print(f"[serve] Command Deck API -> http://{ns.host}:{ns.port}/api/v1/health")
+    print(
+        f"[serve] Command Deck API -> http://{ns.host}:{ns.port}/api/v1/health "
+        f"(currency INR @ ₹{fx_rate}/USD)"
+    )
     print(
         f"[serve] start the UI: cd packages/mv-ui && npm install && "
         f"NEXT_PUBLIC_API_URL=http://{ns.host}:{ns.port} npm run dev"

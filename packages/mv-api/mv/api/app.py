@@ -67,6 +67,8 @@ class ApiState:
     # Command Deck (Phase 8): portfolio summary + per-source health.
     portfolio_provider: Callable[[], dict[str, Any]] = field(default=dict)
     source_health_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
+    # Live dashboard (Phase 10): the continuous loop's equity-curve time series.
+    portfolio_history_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
     # Phase 9 screens: risk limits + exposures, journal search, read-only config.
     risk_provider: Callable[[], dict[str, Any]] = field(default=dict)
     settings_provider: Callable[[], dict[str, Any]] = field(default=dict)
@@ -191,6 +193,11 @@ def create_app(state: ApiState) -> FastAPI:
     def portfolio() -> dict[str, Any]:
         """Command Deck summary: equity, day P&L, drawdown, peak (Phase 8)."""
         return state.portfolio_provider()
+
+    @app.get("/api/v1/portfolio/history")
+    def portfolio_history() -> list[dict[str, Any]]:
+        """Live equity curve: per-tick {ts, equity, day_pnl, decisions, ...} (Phase 10)."""
+        return state.portfolio_history_provider()
 
     @app.get("/api/v1/health/sources")
     def source_health() -> list[dict[str, Any]]:

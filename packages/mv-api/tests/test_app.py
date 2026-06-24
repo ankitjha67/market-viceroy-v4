@@ -96,18 +96,30 @@ def test_portfolio_and_source_health_endpoints() -> None:
         journal=Journal(),
         operator_token=_TOKEN,
         portfolio_provider=lambda: {
-            "equity": "1000000",
-            "day_pnl": "1250.50",
-            "drawdown": "0.02",
-            "peak_equity": "1010000",
+            "equity": "5012.50",
+            "day_pnl": "12.50",
+            "drawdown": "0",
+            "peak_equity": "5012.50",
         },
+        portfolio_history_provider=lambda: [
+            {
+                "ts": "2026-01-01T00:00:00+00:00",
+                "equity": "5000",
+                "day_pnl": "0",
+                "decisions": 1,
+                "fills": 0,
+                "open_positions": 0,
+            },
+        ],
         source_health_provider=lambda: [
             {"source": "ccxt:binance", "domain": "crypto.prices", "status": "green"}
         ],
     )
     client = TestClient(create_app(state))
     portfolio = client.get("/api/v1/portfolio").json()
-    assert portfolio["equity"] == "1000000"
+    assert portfolio["equity"] == "5012.50"
+    history = client.get("/api/v1/portfolio/history").json()
+    assert history[0]["equity"] == "5000"
     sources = client.get("/api/v1/health/sources").json()
     assert sources[0]["status"] == "green"
 
