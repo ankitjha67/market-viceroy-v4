@@ -124,15 +124,18 @@ What happens, end to end:
 Output:
 
 ```
-[paper] BTC/USDT 1h via ccxt:binance (ensemble): 7 decisions, 3 fills, 1 open positions
-[paper]   realized P&L (closed trades): -142.50  |  equity ~ 999857.50
+[paper] BTC/USDT 1h via ccxt:binance (ensemble, INR @ ₹83/USD): 7 decisions, 3 fills, 1 open positions
+[paper]   realized P&L (closed trades): ₹-1.42  |  equity ~ ₹4998.58
 ```
 
-**Important honesty note on "real-time":** each `mv-paper` run acts on the latest
-window of bars and runs **one** session (it is not a always-on streaming daemon).
-To act on new bars, re-run it (e.g. on a schedule). The strategies are
-deterministic, so re-running over the *same* window gives the same result; new
-bars (a new hour/minute elapsing) produce new decisions.
+All values are in **INR** from a **₹5000** start — the loop scales prices by a live
+USD/INR rate from the FX governor (fixed ₹83 fallback offline), so at ₹5000 the
+crypto positions are small fractions of a coin (expected; the `%` risk caps scale).
+
+**Real-time:** `mv-paper` runs **one** session over the latest window (re-run to act
+on new bars). For genuinely continuous trading + the live dashboard, use
+**`mv-serve --watch`** (§5) — it re-runs every interval over a growing window so
+equity accumulates and the dashboard/logs update until you halt it.
 
 ---
 

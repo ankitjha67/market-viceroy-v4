@@ -35,6 +35,14 @@ class _ServeState(TypedDict):
     settings: dict[str, Any]
 
 
+def _inr_fallback() -> Decimal:  # pragma: no cover - trivial env read
+    """Offline USD->INR fallback rate, Operator-tunable via ``MV_USD_INR_FALLBACK``."""
+    try:
+        return Decimal(os.environ.get("MV_USD_INR_FALLBACK", "83"))
+    except ArithmeticError:
+        return Decimal("83")
+
+
 def _kill_switch_for(
     settings: Settings, *, allow_in_memory: bool
 ) -> KillSwitch:  # pragma: no cover - I/O wrapper
@@ -109,7 +117,9 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     registry = build_default_registry()
     router = DataSourceRouter(registry)
     result = router.get_bars(CRYPTO_PRICES, ns.symbol, ns.timeframe, limit=ns.limit)
-    fx_rate = usd_inr_rate(router)  # live USD->INR; the whole session runs in INR
+    fx_rate = usd_inr_rate(
+        router, fallback=_inr_fallback()
+    )  # live USD->INR; the whole session runs in INR
     frame_inr = scale_prices(result.frame, fx_rate)
 
     kill = _kill_switch_for(settings, allow_in_memory=True)
@@ -226,7 +236,9 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     ]
     start_equity = Decimal("5000")  # INR
     mode = "agents" if ns.agents else "ensemble"
-    fx_rate = usd_inr_rate(router)  # live USD->INR via the FX governor; fixed fallback offline
+    fx_rate = usd_inr_rate(
+        router, fallback=_inr_fallback()
+    )  # live USD->INR via the FX governor; fixed fallback offline
 
     # Time series for the live equity curve, and the growing bar window (anchored
     # at launch) so equity accumulates from ₹5000 as new bars close.
@@ -328,7 +340,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
                 try:
                     ticks += 1
                     if ticks % 30 == 0:  # refresh the (daily) FX rate periodically
-                        fx_rate = usd_inr_rate(router)
+                        fx_rate = usd_inr_rate(router, fallback=_inr_fallback())
                     run_tick()
                 except Exception as exc:  # one bad tick must not kill the server
                     print(f"[serve] tick error: {type(exc).__name__}: {exc}")

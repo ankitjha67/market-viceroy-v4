@@ -1,11 +1,21 @@
 # mv-ui
 
-React/Next.js **Command Deck** — Command Deck, Strategy Lab, Agent Room,
-Post-Mortem Room, Arbitrage Monitor, Risk Console, Source Health, Journal
-Explorer, Settings (PRD §8). Editorial/understated; hand-crafted SVG icons;
-**no emojis, no AI-sparkle iconography, no slop**.
+React/Next.js **Live Dashboard** for Market Viceroy v4 — a unified home (₹ equity
+curve, day P&L, Buy/Sell/Hold feed, positions, models/strategies, risk, learning,
+source health) that drills into 9 detail screens: Agent Room, Strategy Lab,
+Post-Mortem Room, Arbitrage Monitor, Risk Console, Journal Explorer, Source Health,
+Settings. Editorial/understated; **no emojis, no AI-sparkle iconography, no slop**.
 
-**Status: Built (Phase 8+).** The full nine-screen Command Deck (Next.js + TypeScript + SWR), with REST polling and an Operator-authed WebSocket stream. A real app, not a stub.
-It is intentionally **not** part of the Python `uv` workspace; it will be a
-standalone Node/Next.js app scaffolded in its owning phase. `package.json`
-here is a stub to mark the package boundary, not a working app.
+Next.js 15 (App Router) + React 19 + TypeScript + SWR (polling) + an Operator-authed
+WebSocket + `lightweight-charts` (the equity curve). Money arrives as Decimal
+strings from `mv-api` and is only *formatted* (INR), never re-computed as float.
+
+```bash
+npm ci
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000 npm run dev          # http://localhost:3000
+npm run lint && npm run typecheck && npm test && npm run build  # the frontend CI gate
+```
+
+Start the backend first — `uv run mv-serve --watch` (continuous, INR) with
+`MV_OPERATOR_TOKEN` set. The dashboard polls it and updates each tick; the
+kill-switch relays the Operator's authed halt/reset. See `docs/RUNBOOK.md`.
