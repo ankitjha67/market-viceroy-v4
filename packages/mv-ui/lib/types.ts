@@ -14,6 +14,16 @@ export interface Portfolio {
   peak_equity: string;
 }
 
+/** One tick on the live equity curve (the continuous --watch loop appends these). */
+export interface HistoryPoint {
+  ts: string;
+  equity: string;
+  day_pnl: string;
+  decisions: number;
+  fills: number;
+  open_positions: number;
+}
+
 export interface Position {
   instrument: string;
   size: string;

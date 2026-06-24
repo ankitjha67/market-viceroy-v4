@@ -9,6 +9,7 @@ import type {
   CategoryStat,
   DecisionRow,
   Health,
+  HistoryPoint,
   Improvement,
   Portfolio,
   Position,
@@ -45,6 +46,9 @@ export const useHealth = (): Polled<Health> => usePolled<Health>(ENDPOINTS.healt
 
 export const usePortfolio = (): Polled<Portfolio> =>
   usePolled<Portfolio>(ENDPOINTS.portfolio, never);
+
+export const useHistory = (): Polled<HistoryPoint[]> =>
+  usePolled<HistoryPoint[]>(ENDPOINTS.portfolioHistory, (d) => d.length === 0);
 
 export const usePositions = (): Polled<Position[]> =>
   usePolled<Position[]>(ENDPOINTS.positions, (d) => d.length === 0);

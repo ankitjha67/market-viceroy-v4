@@ -47,6 +47,7 @@ export function resetKillSwitch(token: string, operatorId: string): Promise<void
 export const ENDPOINTS = {
   health: "/api/v1/health",
   portfolio: "/api/v1/portfolio",
+  portfolioHistory: "/api/v1/portfolio/history",
   positions: "/api/v1/positions",
   decisions: "/api/v1/decisions",
   sourceHealth: "/api/v1/health/sources",

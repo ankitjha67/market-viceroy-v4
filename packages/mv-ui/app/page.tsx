@@ -1,5 +1,5 @@
-import { CommandDeck } from "@/components/CommandDeck";
+import { LiveDashboard } from "@/components/LiveDashboard";
 
 export default function Page() {
-  return <CommandDeck />;
+  return <LiveDashboard />;
 }
