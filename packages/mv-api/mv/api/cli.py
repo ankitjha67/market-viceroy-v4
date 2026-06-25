@@ -90,12 +90,9 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     """Run one live paper session: governor bars -> ensemble -> risk -> paper fills."""
     import argparse
 
-    from alphakit.strategies.trend.donchian_breakout_20 import DonchianBreakout20
-    from alphakit.strategies.trend.ema_cross_12_26 import EMACross1226
-    from alphakit.strategies.trend.sma_cross_10_30 import SMACross1030
-    from mv.agents.baseline.runner import SignalStrategy
     from mv.api.fx import scale_prices, usd_inr_rate
     from mv.api.paper_loop import run_paper_session
+    from mv.api.roster import available_names, default_crypto_roster, roster_from_names
     from mv.postmortem.trades import fill_from_journal, reconstruct_closed_trades
     from mv.risk.engine import RiskEngine
     from nautilus_trader.test_kit.providers import TestInstrumentProvider
@@ -106,6 +103,11 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     parser.add_argument("--symbol", default="BTC/USDT")
     parser.add_argument("--timeframe", default="1h")
     parser.add_argument("--limit", type=int, default=200, help="bars to pull from the governor")
+    parser.add_argument(
+        "--strategies",
+        default="",
+        help="comma-separated strategy names to trade (default: the full crypto roster)",
+    )
     parser.add_argument(
         "--agents",
         action="store_true",
@@ -126,11 +128,13 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     risk = RiskEngine(RiskLimits.aggressive(), kill)
     journal = Journal()
     instrument = TestInstrumentProvider.btcusdt_binance()
-    strategies: list[SignalStrategy] = [
-        EMACross1226(long_only=True),
-        SMACross1030(),
-        DonchianBreakout20(),
-    ]
+    strategies = (
+        roster_from_names(ns.strategies.split(",")) if ns.strategies else default_crypto_roster()
+    )
+    if not strategies:
+        raise SystemExit(
+            f"mv-paper: --strategies matched none; valid: {', '.join(available_names())}"
+        )
 
     start_equity = Decimal("5000")  # INR
     engine = run_paper_session(
@@ -153,7 +157,8 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     mode = "agents" if ns.agents else "ensemble"
     print(
         f"[paper] {ns.symbol} {ns.timeframe} via {result.source} ({mode}, INR @ ₹{fx_rate}/USD): "
-        f"{decisions} decisions, {len(fills)} fills, {len(engine.cache.positions())} open positions"
+        f"{len(strategies)} strategies, {decisions} decisions, {len(fills)} fills, "
+        f"{len(engine.cache.positions())} open positions"
     )
     print(
         f"[paper]   realized P&L (closed trades): ₹{realized}  |  equity ~ ₹{start_equity + realized}"
@@ -184,15 +189,17 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
 
     import polars as pl
     import uvicorn
-    from alphakit.strategies.trend.donchian_breakout_20 import DonchianBreakout20
-    from alphakit.strategies.trend.ema_cross_12_26 import EMACross1226
-    from alphakit.strategies.trend.sma_cross_10_30 import SMACross1030
-    from mv.agents.baseline.runner import SignalStrategy
     from mv.api.app import ApiState, create_app
     from mv.api.bars import merge_bars
     from mv.api.fx import scale_prices, usd_inr_rate
     from mv.api.learning import mistakes_from_fills
     from mv.api.paper_loop import run_paper_session
+    from mv.api.roster import (
+        available_names,
+        default_crypto_roster,
+        roster_from_names,
+        roster_names,
+    )
     from mv.api.snapshot import portfolio_from_fills, positions_from_fills
     from mv.postmortem.trades import fill_from_journal
     from mv.risk.engine import RiskEngine
@@ -204,6 +211,11 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     parser.add_argument("--symbol", default="BTC/USDT")
     parser.add_argument("--timeframe", default="1h")
     parser.add_argument("--limit", type=int, default=200, help="bars to pull from the governor")
+    parser.add_argument(
+        "--strategies",
+        default="",
+        help="comma-separated strategy names to trade (default: the full crypto roster)",
+    )
     parser.add_argument("--agents", action="store_true", help="use the LangGraph agent pipeline")
     parser.add_argument(
         "--watch", action="store_true", help="re-run continuously as new bars close"
@@ -230,11 +242,13 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     kill = _kill_switch_for(settings, allow_in_memory=True)
     risk = RiskEngine(RiskLimits.aggressive(), kill)
     instrument = TestInstrumentProvider.btcusdt_binance()
-    strategies: list[SignalStrategy] = [
-        EMACross1226(long_only=True),
-        SMACross1030(),
-        DonchianBreakout20(),
-    ]
+    strategies = (
+        roster_from_names(ns.strategies.split(",")) if ns.strategies else default_crypto_roster()
+    )
+    if not strategies:
+        raise SystemExit(
+            f"mv-serve: --strategies matched none; valid: {', '.join(available_names())}"
+        )
     start_equity = Decimal("5000")  # INR
     mode = "agents" if ns.agents else "ensemble"
     fx_rate = usd_inr_rate(
@@ -249,7 +263,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     peak_equity = start_equity
 
     limits = risk.limits
-    live_strategies = "ema_cross_12_26, sma_cross_10_30, donchian_breakout_20"
+    live_strategies = ", ".join(roster_names(strategies))
 
     # The mutable view the injected providers read; the loop swaps it each tick.
     view: _ServeState = {

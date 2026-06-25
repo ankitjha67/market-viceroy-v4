@@ -98,6 +98,42 @@
   margin-bottom: var(--space-2);
 }
 
+/* Journal Explorer — the complete drill-down log. */
+.logRow {
+  cursor: pointer;
+}
+.logRow:hover {
+  background: var(--surface-sunk);
+}
+.disclose {
+  font: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-faint);
+  padding: 0 4px;
+  line-height: 1;
+}
+.summary {
+  max-width: 520px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-faint);
+}
+.record {
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--surface-sunk);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: var(--leading-normal, 1.6);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
 .kv {
   margin: 0;
   display: flex;
