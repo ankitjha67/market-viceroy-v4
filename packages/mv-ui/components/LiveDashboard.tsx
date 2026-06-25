@@ -47,6 +47,13 @@ export function LiveDashboard() {
   const symbol = String(s.symbol ?? "—");
   const timeframe = String(s.timeframe ?? "—");
   const fx = s.fx_usd_inr ? `₹${String(s.fx_usd_inr)}/USD` : "";
+  const weighting = String(s.weighting ?? "equal-weight");
+  const regime = (s.regime ?? null) as {
+    label: string;
+    trend_score: string;
+    trend_weight: string;
+    meanrev_weight: string;
+  } | null;
 
   const active = strategies.data?.filter((x) => x.gate_status === "active").length ?? 0;
   const observe = strategies.data?.filter((x) => x.gate_status === "observe").length ?? 0;
@@ -63,6 +70,7 @@ export function LiveDashboard() {
             <span className="mono">{symbol}</span>
             <span className="mono">{timeframe}</span>
             {fx && <span className="mono">{fx}</span>}
+            {regime && <span>regime: {regime.label}</span>}
           </div>
         </div>
         <KillSwitch tripped={health.data?.kill_switch_tripped ?? false} />
@@ -159,9 +167,16 @@ export function LiveDashboard() {
           <TileTitle href="/strategies">Models &amp; strategies</TileTitle>
           <StatePanel state={strategies.state} error="Strategy catalog unavailable." emptyMessage="No strategies yet.">
             <p className={styles.note}>
-              Decision engine: <strong>{engine}</strong> — trading{" "}
+              Decision engine: <strong>{engine}</strong> ({weighting}) — trading{" "}
               <strong>{String(s.live_strategies ?? "—")}</strong>.
             </p>
+            {regime && (
+              <p className={styles.note}>
+                Regime: <strong>{regime.label}</strong> (ER {Number(regime.trend_score).toFixed(2)}) —
+                weighting <strong>{(Number(regime.trend_weight) * 100).toFixed(0)}%</strong> trend /{" "}
+                <strong>{(Number(regime.meanrev_weight) * 100).toFixed(0)}%</strong> mean-rev, live.
+              </p>
+            )}
             <p className={styles.note}>
               Catalog: <strong>{active}</strong> gate-active · <strong>{observe}</strong> observing of{" "}
               {strategies.data?.length ?? 0}.

@@ -22,10 +22,24 @@ fills, open_positions}` to an in-memory history buffer, served at
 equity curve updates each tick until the Operator halts the loop (which pauses it).
 
 **Unified dashboard.** The home screen (`LiveDashboard`) shows ₹ equity / P&L /
-drawdown, a mode strip (paper · engine · symbol · timeframe · FX), the kill-switch,
-the equity curve, open positions, the Buy/Sell/Hold feed, models & strategies,
-risk & exposure, learning, and source health — each tile a four-state `StatePanel`
-that drills into one of the 9 detail screens.
+drawdown, a mode strip (paper · engine · symbol · timeframe · FX · regime), the
+kill-switch, the equity curve, open positions, the Buy/Sell/Hold feed, models &
+strategies, risk & exposure, learning, and source health — each tile a four-state
+`StatePanel` that drills into one of the 9 detail screens.
+
+**Regime-adaptive ensemble (dynamic, not hardcoded).** The ensemble is no longer
+a fixed equal-weight blend: each bar the **market regime** is detected
+point-in-time from price action via **Kaufman's Efficiency Ratio** (`mv-agents`
+`baseline/regime.py`), and the strategy **families are re-weighted** — trend
+followers upweighted in trends, mean-reversion in chop — smoothed (overlapping
+lookback) with a floor so neither family is ever fully off. This is
+**market-structure driven, never PnL-driven** (performance-chasing is the naive
+behaviour CLAUDE.md #5 forbids; governed weight changes stay the Phase-5
+propose-only path), and the **validated roster is the universe** — the regime only
+modulates influence. The detected regime + family weights are journaled each bar
+(a `regime` record, glass box) and surfaced live on the dashboard. Default-on;
+`mv-serve --static-weights` falls back to equal weight, `--strategies` picks a
+subset.
 
 ## What shipped
 

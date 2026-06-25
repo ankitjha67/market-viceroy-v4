@@ -92,7 +92,12 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
 
     from mv.api.fx import scale_prices, usd_inr_rate
     from mv.api.paper_loop import run_paper_session
-    from mv.api.roster import available_names, default_crypto_roster, roster_from_names
+    from mv.api.roster import (
+        available_names,
+        categories_for,
+        default_crypto_roster,
+        roster_from_names,
+    )
     from mv.postmortem.trades import fill_from_journal, reconstruct_closed_trades
     from mv.risk.engine import RiskEngine
     from nautilus_trader.test_kit.providers import TestInstrumentProvider
@@ -107,6 +112,11 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         "--strategies",
         default="",
         help="comma-separated strategy names to trade (default: the full crypto roster)",
+    )
+    parser.add_argument(
+        "--static-weights",
+        action="store_true",
+        help="disable regime-adaptive weighting (use a plain equal-weight ensemble)",
     )
     parser.add_argument(
         "--agents",
@@ -148,6 +158,8 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         warmup=30,
         starting_equity=start_equity,
         use_agents=ns.agents,
+        categories=categories_for(strategies),
+        regime_adaptive=not ns.static_weights,
     )
     decisions = sum(1 for e in journal.entries() if e.kind == "decision")
     fills = [
@@ -196,6 +208,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     from mv.api.paper_loop import run_paper_session
     from mv.api.roster import (
         available_names,
+        categories_for,
         default_crypto_roster,
         roster_from_names,
         roster_names,
@@ -215,6 +228,11 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         "--strategies",
         default="",
         help="comma-separated strategy names to trade (default: the full crypto roster)",
+    )
+    parser.add_argument(
+        "--static-weights",
+        action="store_true",
+        help="disable regime-adaptive weighting (use a plain equal-weight ensemble)",
     )
     parser.add_argument("--agents", action="store_true", help="use the LangGraph agent pipeline")
     parser.add_argument(
@@ -249,6 +267,8 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         raise SystemExit(
             f"mv-serve: --strategies matched none; valid: {', '.join(available_names())}"
         )
+    categories = categories_for(strategies)
+    regime_adaptive = not ns.static_weights
     start_equity = Decimal("5000")  # INR
     mode = "agents" if ns.agents else "ensemble"
     fx_rate = usd_inr_rate(
@@ -277,6 +297,8 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             "timeframe": ns.timeframe,
             "currency": "INR",
             "fx_usd_inr": str(fx_rate),
+            "weighting": "regime-adaptive" if regime_adaptive else "equal-weight",
+            "regime": None,
             "watch": bool(ns.watch),
             "interval_seconds": ns.interval,
             "source": "",
@@ -363,6 +385,8 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             warmup=30,
             starting_equity=start_equity,
             use_agents=ns.agents,
+            categories=categories,
+            regime_adaptive=regime_adaptive,
         )
         engine.dispose()
         fills = [
@@ -376,7 +400,13 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         decisions = sum(1 for e in journal.entries() if e.kind == "decision")
         view["portfolio"] = portfolio
         view["positions"] = positions
-        view["settings"] = {**view["settings"], "source": fresh.source}
+        regime_entries = [e for e in journal.entries() if e.kind == "regime"]
+        latest_regime = regime_entries[-1].payload if regime_entries else None
+        view["settings"] = {
+            **view["settings"],
+            "source": fresh.source,
+            "regime": latest_regime,
+        }
         state.journal = journal  # atomic swap; request handlers read the latest
         stamp = datetime.now(timezone.utc)
         history.append(

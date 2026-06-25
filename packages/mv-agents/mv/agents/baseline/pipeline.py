@@ -12,7 +12,7 @@ window and passes the latest per-strategy weight in as a :class:`StrategySignal`
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -39,8 +39,15 @@ def ensemble_decision(
     snapshot_id: str,
     hold_threshold: Decimal = Decimal("0.05"),
     risk_ref: str = "pending",
+    weights: Mapping[str, Decimal] | None = None,
+    note: str = "",
 ) -> TradeDecision:
-    """Combine per-strategy signals into a governed equal-weight Buy/Sell/Hold.
+    """Combine per-strategy signals into a governed Buy/Sell/Hold.
+
+    Equal-weight by default; pass ``weights`` (per-strategy multipliers, e.g. the
+    regime-adaptive family weights) for a weighted blend — the ensemble is then
+    ``Σ wᵢ·sᵢ / Σ wᵢ``. ``weights`` re-weights *signals already produced by the
+    validated roster*; it is never derived from PnL (CLAUDE.md #5).
 
     Args:
         signals: One :class:`StrategySignal` per running strategy (non-empty).
@@ -50,6 +57,10 @@ def ensemble_decision(
         hold_threshold: |ensemble weight| at/below which the call is HOLD.
         risk_ref: Reference to the gating ``RiskAssessment`` (the loop fills
             this after the risk check; defaults to ``"pending"``).
+        weights: Optional per-strategy multipliers keyed by strategy name
+            (missing -> 1). ``None`` or a zero sum falls back to equal weight.
+        note: Optional human-readable note appended to the rationale (e.g. the
+            detected regime), for the glass-box log.
 
     Returns:
         The proposed :class:`~mv.agents.schemas.TradeDecision`.
@@ -61,12 +72,20 @@ def ensemble_decision(
         raise ValueError("ensemble_decision requires at least one strategy signal")
 
     n = len(signals)
-    weights = [s.weight for s in signals]
-    ensemble = sum(weights, _ZERO) / n
+    sig_weights = [s.weight for s in signals]
+    if weights is None:
+        multipliers = [Decimal(1)] * n
+    else:
+        multipliers = [Decimal(str(weights.get(s.strategy, 1))) for s in signals]
+    total_w = sum(multipliers, _ZERO)
+    if total_w <= _ZERO:  # degenerate (all zero) -> equal weight
+        multipliers = [Decimal(1)] * n
+        total_w = Decimal(n)
+    ensemble = sum((w * m for w, m in zip(sig_weights, multipliers, strict=True)), _ZERO) / total_w
 
-    longs = sum(1 for w in weights if w > 0)
-    shorts = sum(1 for w in weights if w < 0)
-    flats = sum(1 for w in weights if abs(w) <= hold_threshold)
+    longs = sum(1 for w in sig_weights if w > 0)
+    shorts = sum(1 for w in sig_weights if w < 0)
+    flats = sum(1 for w in sig_weights if abs(w) <= hold_threshold)
 
     action: Literal["BUY", "SELL", "HOLD"]
     if ensemble > hold_threshold:
@@ -93,6 +112,8 @@ def ensemble_decision(
         f"ensemble {ensemble:+.4f} over {n} strategies "
         f"({longs} long, {shorts} short, {flats} flat) -> {action}"
     )
+    if note:
+        rationale = f"{rationale} | {note}"
 
     return TradeDecision(
         agent="ensemble_pm",

@@ -41,6 +41,13 @@ def _strategies() -> list[SignalStrategy]:
     return [EMACross1226(long_only=True), SMACross1030(), DonchianBreakout20()]
 
 
+_CATEGORIES = {
+    "ema_cross_12_26": "trend",
+    "sma_cross_10_30": "trend",
+    "donchian_breakout_20": "trend",
+}
+
+
 def test_full_paper_loop_journals_decisions_and_fills() -> None:
     journal = Journal()
     risk = RiskEngine(RiskLimits.aggressive(), KillSwitch())
@@ -89,6 +96,58 @@ def test_full_paper_loop_journals_decisions_and_fills() -> None:
 
         # The whole decision trail is tamper-evident and intact.
         journal.verify()
+    finally:
+        engine.dispose()
+
+
+def test_regime_adaptive_loop_journals_the_detected_regime() -> None:
+    journal = Journal()
+    risk = RiskEngine(RiskLimits.aggressive(), KillSwitch())
+    instrument = TestInstrumentProvider.btcusdt_binance()
+
+    engine = run_paper_session(
+        frame=_rising_frame(60),  # a steady uptrend -> a "trending" regime
+        symbol="BTC/USDT",
+        timeframe="1h",
+        strategies=_strategies(),
+        risk_engine=risk,
+        journal=journal,
+        instrument=instrument,
+        warmup=30,
+        starting_equity=Decimal("5000"),
+        categories=_CATEGORIES,  # regime-adaptive on
+    )
+    try:
+        regimes = [e for e in journal.entries() if e.kind == "regime"]
+        assert len(regimes) >= 25  # one per post-warmup bar
+        last = regimes[-1].payload
+        assert last["label"] == "trending"
+        # In a trend the trend family is upweighted vs mean-reversion.
+        assert float(last["trend_weight"]) > float(last["meanrev_weight"])
+    finally:
+        engine.dispose()
+
+
+def test_static_weights_loop_records_no_regime() -> None:
+    journal = Journal()
+    risk = RiskEngine(RiskLimits.aggressive(), KillSwitch())
+    instrument = TestInstrumentProvider.btcusdt_binance()
+
+    engine = run_paper_session(
+        frame=_rising_frame(60),
+        symbol="BTC/USDT",
+        timeframe="1h",
+        strategies=_strategies(),
+        risk_engine=risk,
+        journal=journal,
+        instrument=instrument,
+        warmup=30,
+        starting_equity=Decimal("5000"),
+        categories=_CATEGORIES,
+        regime_adaptive=False,  # equal-weight: no regime detection
+    )
+    try:
+        assert all(e.kind != "regime" for e in journal.entries())
     finally:
         engine.dispose()
 
