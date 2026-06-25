@@ -61,10 +61,22 @@ def test_full_paper_loop_journals_decisions_and_fills() -> None:
         kinds = [e.kind for e in journal.entries()]
         decisions = [e for e in journal.entries() if e.kind == "decision"]
         executions = [e for e in journal.entries() if e.kind == "execution"]
+        signal_logs = [e for e in journal.entries() if e.kind == "signals"]
 
         # A decision (and its risk assessment) per post-warmup bar.
         assert len(decisions) >= 25
         assert "risk_assessment" in kinds
+
+        # The glass box: every strategy's vote journaled per decision (not just the
+        # combined Buy/Sell/Hold) — one signals record per post-warmup bar.
+        assert len(signal_logs) >= 25
+        first_signals = signal_logs[0].payload
+        assert first_signals["instrument"] == "BTC/USDT"
+        assert {s["strategy"] for s in first_signals["signals"]} == {
+            "ema_cross_12_26",
+            "sma_cross_10_30",
+            "donchian_breakout_20",
+        }
         # The uptrend produced at least one BUY that executed to a paper fill.
         assert any(d.payload["action"] == "BUY" for d in decisions)
         assert len(executions) >= 1

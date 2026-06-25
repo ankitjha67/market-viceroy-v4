@@ -107,3 +107,25 @@ def test_strategy_signals_extract_latest() -> None:
         "donchian_breakout_20",
     }
     assert all(s.weight > 0 for s in signals)  # all long on the uptrend
+
+
+def test_decide_carries_per_strategy_signals_for_the_glass_box() -> None:
+    prices = [100.0 * (1.01**i) for i in range(250)]
+    gated = decide(
+        _strategies(),
+        _window(prices),
+        symbol=_SYMBOL,
+        ts=_TS,
+        snapshot_id="snap-4",
+        equity=_EQUITY,
+        risk_engine=_engine(),
+        portfolio_state=_flat_state(),
+    )
+    # The gated decision carries every strategy's vote so the loop journals the
+    # full glass-box signal log, not just the combined Buy/Sell/Hold.
+    assert len(gated.signals) == 3
+    assert {s.strategy for s in gated.signals} == {
+        "ema_cross_12_26",
+        "sma_cross_10_30",
+        "donchian_breakout_20",
+    }

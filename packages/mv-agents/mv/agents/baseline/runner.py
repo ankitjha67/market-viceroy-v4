@@ -11,7 +11,7 @@ exchange or engine.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Protocol, runtime_checkable
@@ -33,13 +33,20 @@ class SignalStrategy(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class GatedDecision:
-    """The decision plus its risk verdict and what to execute."""
+    """The decision plus its risk verdict and what to execute.
+
+    ``signals`` carries the per-strategy votes that produced the ensemble (empty
+    on the agent-graph path, which journals its own transcript). The loop journals
+    them as a ``signals`` record so the glass-box log shows every strategy's
+    weight, not just the combined Buy/Sell/Hold.
+    """
 
     decision: TradeDecision
     risk: RiskAssessment
     execute: bool
     side: Literal["BUY", "SELL"] | None
     notional: Decimal
+    signals: tuple[StrategySignal, ...] = ()
 
 
 def strategy_signals(
@@ -143,7 +150,7 @@ def decide(
         snapshot_id=snapshot_id,
         hold_threshold=hold_threshold,
     )
-    return gate_proposed_trade(
+    gated = gate_proposed_trade(
         proposed,
         symbol=symbol,
         ts=ts,
@@ -152,3 +159,5 @@ def decide(
         risk_engine=risk_engine,
         portfolio_state=portfolio_state,
     )
+    # Carry the per-strategy votes so the loop can journal the full glass-box log.
+    return replace(gated, signals=tuple(signals))

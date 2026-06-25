@@ -141,7 +141,19 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         )
 
     def _record(self, gated: GatedDecision) -> None:
-        """Journal the decision + risk assessment (the baseline does it here)."""
+        """Journal the per-strategy signals + decision + risk assessment (glass box)."""
+        if gated.signals:
+            self._journal.append(
+                "signals",
+                {
+                    "snapshot_id": gated.decision.snapshot_id,
+                    "instrument": self._symbol,
+                    "action": gated.decision.action,
+                    "signals": [
+                        {"strategy": s.strategy, "weight": str(s.weight)} for s in gated.signals
+                    ],
+                },
+            )
         self._journal.append("decision", gated.decision.model_dump(mode="json"))
         self._journal.append("risk_assessment", gated.risk.model_dump(mode="json"))
 
