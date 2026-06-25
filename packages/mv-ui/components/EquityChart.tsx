@@ -7,6 +7,7 @@ import {
   type AreaData,
   type IChartApi,
   type ISeriesApi,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import type { HistoryPoint } from "@/lib/types";
@@ -23,6 +24,22 @@ export function EquityChart({ points }: { points: HistoryPoint[] }) {
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    // Render the time axis in the viewer's local timezone (e.g. IST), not the
+    // chart's default UTC. The timestamps stay true UTC; only the labels localize.
+    const axisLabel = (t: Time) =>
+      new Date(Number(t) * 1000).toLocaleTimeString(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      });
+    const crosshairLabel = (t: Time) =>
+      new Date(Number(t) * 1000).toLocaleString(undefined, {
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      });
     const chart = createChart(el, {
       height: 240,
       layout: {
@@ -32,7 +49,13 @@ export function EquityChart({ points }: { points: HistoryPoint[] }) {
       },
       grid: { horzLines: { color: "#e7e2d8" }, vertLines: { visible: false } },
       rightPriceScale: { borderVisible: false },
-      timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
+      localization: { timeFormatter: crosshairLabel },
+      timeScale: {
+        borderVisible: false,
+        timeVisible: true,
+        secondsVisible: false,
+        tickMarkFormatter: axisLabel,
+      },
       handleScale: false,
       handleScroll: false,
     });
