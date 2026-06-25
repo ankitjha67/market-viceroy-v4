@@ -242,9 +242,11 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     )  # live USD->INR via the FX governor; fixed fallback offline
 
     # Time series for the live equity curve, and the growing bar window (anchored
-    # at launch) so equity accumulates from ₹5000 as new bars close.
+    # at launch) so equity accumulates from ₹5000 as new bars close. ``peak_equity``
+    # is the running high-water mark threaded across ticks for an honest drawdown.
     history: list[dict[str, Any]] = []
     working_frame: pl.DataFrame | None = None
+    peak_equity = start_equity
 
     limits = risk.limits
     live_strategies = "ema_cross_12_26, sma_cross_10_30, donchian_breakout_20"
@@ -320,7 +322,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
 
     def run_tick() -> None:
         """Grow the window with the latest bars, run a paper session in INR, swap the view."""
-        nonlocal working_frame
+        nonlocal working_frame, peak_equity
         fresh = router.get_bars(CRYPTO_PRICES, ns.symbol, ns.timeframe, limit=ns.limit)
         working_frame = (
             fresh.frame
@@ -328,6 +330,13 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             else merge_bars(working_frame, fresh.frame, max_bars=ns.max_bars)
         )
         frame_inr = scale_prices(working_frame, fx_rate)
+        # The live mark = the latest INR close; open positions mark to it so equity
+        # and P&L move with the market instead of sitting frozen at the entry.
+        marks = (
+            {ns.symbol: Decimal(str(frame_inr.get_column("close").tail(1).item()))}
+            if frame_inr.height
+            else {}
+        )
         journal = Journal()
         engine = run_paper_session(
             frame=frame_inr,
@@ -347,8 +356,9 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             for e in journal.entries()
             if e.kind == "execution"
         ]
-        portfolio = portfolio_from_fills(fills, start_equity)
-        positions = positions_from_fills(fills)
+        portfolio = portfolio_from_fills(fills, start_equity, marks=marks, peak_equity=peak_equity)
+        positions = positions_from_fills(fills, marks=marks)
+        peak_equity = Decimal(portfolio["peak_equity"])
         decisions = sum(1 for e in journal.entries() if e.kind == "decision")
         view["portfolio"] = portfolio
         view["positions"] = positions

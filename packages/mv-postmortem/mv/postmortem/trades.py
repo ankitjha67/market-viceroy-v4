@@ -64,6 +64,21 @@ class ClosedTrade:
         return gross - self.fees
 
 
+@dataclass(frozen=True, slots=True)
+class OpenPosition:
+    """The still-open net position in one instrument after FIFO matching.
+
+    ``net_qty`` carries the sign (long > 0, short < 0); ``avg_price`` is the
+    quantity-weighted cost basis of the lots still open (the remainder after FIFO
+    round-trip matching), so the unrealized mark-to-market is
+    ``(mark - avg_price) * net_qty``.
+    """
+
+    instrument: str
+    net_qty: Decimal
+    avg_price: Decimal
+
+
 def _intended(fill: Fill) -> Decimal:
     return fill.intended_price if fill.intended_price is not None else fill.fill_price
 
@@ -78,13 +93,14 @@ class _OpenLot:
     remaining: Decimal
 
 
-def reconstruct_closed_trades(fills: list[Fill]) -> list[ClosedTrade]:
-    """Pair fills into entry→exit round trips (FIFO per instrument).
+def _fifo_walk(fills: list[Fill]) -> tuple[list[ClosedTrade], dict[str, deque[_OpenLot]]]:
+    """The shared FIFO pass: pair fills into round trips and keep the open remainder.
 
     A fill opens or extends a position; an opposite-side fill closes against the
-    oldest open lot(s). Quantity is matched lot-by-lot so partial closes produce
-    one :class:`ClosedTrade` per matched slice. Any still-open lot at the end is
-    left unclosed (no attribution until it closes). Deterministic.
+    oldest open lot(s), matched lot-by-lot so partial closes produce one
+    :class:`ClosedTrade` per matched slice. Returns the closed trades **and** the
+    per-instrument lots still open at the end, so callers can read either side of
+    the same walk without duplicating the matching logic. Deterministic.
     """
     open_lots: dict[str, deque[_OpenLot]] = defaultdict(deque)
     trades: list[ClosedTrade] = []
@@ -111,7 +127,40 @@ def reconstruct_closed_trades(fills: list[Fill]) -> list[ClosedTrade]:
         if to_close > _ZERO:  # the close overfills -> the remainder opens the other way
             lots.append(_OpenLot(fill, to_close))
 
+    return trades, open_lots
+
+
+def reconstruct_closed_trades(fills: list[Fill]) -> list[ClosedTrade]:
+    """Pair fills into entry→exit round trips (FIFO per instrument).
+
+    Any still-open lot at the end is left unclosed (no attribution until it
+    closes); see :func:`open_positions` for the open remainder of the same walk.
+    Deterministic.
+    """
+    trades, _ = _fifo_walk(fills)
     return trades
+
+
+def open_positions(fills: list[Fill]) -> list[OpenPosition]:
+    """The net open position per instrument after FIFO round-trip matching.
+
+    The complement of :func:`reconstruct_closed_trades`: what is still **open**
+    after closing fills are matched FIFO against opening lots, aggregated to a
+    signed net quantity and the quantity-weighted cost basis of the open lots.
+    Flat instruments are omitted; ordering is deterministic by instrument. This
+    is the basis the live mark-to-market P&L is computed against.
+    """
+    _, open_lots = _fifo_walk(fills)
+    out: list[OpenPosition] = []
+    for sym in sorted(open_lots):
+        lots = open_lots[sym]
+        qty = sum((lot.remaining for lot in lots), _ZERO)
+        if qty == _ZERO:
+            continue
+        notional = sum((lot.remaining * lot.fill.fill_price for lot in lots), _ZERO)
+        sign = Decimal(1) if lots[0].fill.side == "BUY" else Decimal(-1)
+        out.append(OpenPosition(instrument=sym, net_qty=sign * qty, avg_price=notional / qty))
+    return out
 
 
 def _same_side(a: str, b: str) -> bool:
@@ -166,4 +215,11 @@ def fill_from_journal(payload: Mapping[str, Any], *, ts: datetime) -> Fill:
     )
 
 
-__all__ = ["ClosedTrade", "Fill", "fill_from_journal", "reconstruct_closed_trades"]
+__all__ = [
+    "ClosedTrade",
+    "Fill",
+    "OpenPosition",
+    "fill_from_journal",
+    "open_positions",
+    "reconstruct_closed_trades",
+]
