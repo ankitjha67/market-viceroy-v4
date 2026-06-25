@@ -10,7 +10,7 @@ exchange or engine.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
@@ -18,6 +18,7 @@ from typing import Literal, Protocol, runtime_checkable
 
 import pandas as pd
 from mv.agents.baseline.pipeline import StrategySignal, ensemble_decision
+from mv.agents.baseline.regime import RegimeView, detect_regime, family_weight
 from mv.agents.schemas import RiskAssessment, TradeDecision
 from mv.risk.engine import PortfolioState, ProposedTrade, RiskEngine, RiskResult
 
@@ -47,6 +48,7 @@ class GatedDecision:
     side: Literal["BUY", "SELL"] | None
     notional: Decimal
     signals: tuple[StrategySignal, ...] = ()
+    regime: RegimeView | None = None  # the detected market regime (None = equal-weight)
 
 
 def strategy_signals(
@@ -140,15 +142,41 @@ def decide(
     risk_engine: RiskEngine,
     portfolio_state: PortfolioState,
     hold_threshold: Decimal = Decimal("0.05"),
+    categories: Mapping[str, str] | None = None,
+    regime_lookback: int = 30,
+    regime_floor: float = 0.1,
 ) -> GatedDecision:
-    """Run strategies -> ensemble -> size -> risk gate; return the gated decision."""
+    """Run strategies -> (regime-weighted) ensemble -> size -> risk gate.
+
+    When ``categories`` is given (strategy name -> ``"trend" | "meanrev"``), the
+    market regime is detected point-in-time from the close window and used to
+    weight the families — trend followers in trends, mean-reversion in chop. With
+    ``categories=None`` the ensemble is plain equal-weight (the original
+    behaviour). Regime weighting is market-structure driven, never PnL-driven.
+    """
     signals = strategy_signals(strategies, window, symbol)
+    regime: RegimeView | None = None
+    weights: dict[str, Decimal] | None = None
+    note = ""
+    if categories is not None and symbol in window.columns and len(window) > 0:
+        closes = [float(x) for x in window[symbol].tolist()]
+        regime = detect_regime(closes, lookback=regime_lookback, floor=regime_floor)
+        weights = {
+            s.strategy: Decimal(str(family_weight(categories.get(s.strategy, "trend"), regime)))
+            for s in signals
+        }
+        note = (
+            f"regime {regime.label} ER={regime.trend_score:.2f} "
+            f"(trend x{regime.trend_weight:.2f}, meanrev x{regime.meanrev_weight:.2f})"
+        )
     proposed = ensemble_decision(
         signals,
         instrument=symbol,
         ts=ts,
         snapshot_id=snapshot_id,
         hold_threshold=hold_threshold,
+        weights=weights,
+        note=note,
     )
     gated = gate_proposed_trade(
         proposed,
@@ -159,5 +187,5 @@ def decide(
         risk_engine=risk_engine,
         portfolio_state=portfolio_state,
     )
-    # Carry the per-strategy votes so the loop can journal the full glass-box log.
-    return replace(gated, signals=tuple(signals))
+    # Carry the per-strategy votes + regime so the loop journals the glass-box log.
+    return replace(gated, signals=tuple(signals), regime=regime)

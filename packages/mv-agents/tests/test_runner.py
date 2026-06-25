@@ -129,3 +129,44 @@ def test_decide_carries_per_strategy_signals_for_the_glass_box() -> None:
         "sma_cross_10_30",
         "donchian_breakout_20",
     }
+
+
+_CATEGORIES = {
+    "ema_cross_12_26": "trend",
+    "sma_cross_10_30": "trend",
+    "donchian_breakout_20": "trend",
+}
+
+
+def test_decide_without_categories_is_equal_weight_no_regime() -> None:
+    prices = [100.0 * (1.01**i) for i in range(250)]
+    gated = decide(
+        _strategies(),
+        _window(prices),
+        symbol=_SYMBOL,
+        ts=_TS,
+        snapshot_id="snap-eq",
+        equity=_EQUITY,
+        risk_engine=_engine(),
+        portfolio_state=_flat_state(),
+    )
+    assert gated.regime is None  # equal-weight path, no regime detected
+
+
+def test_decide_with_categories_detects_regime_and_notes_it() -> None:
+    prices = [100.0 * (1.01**i) for i in range(250)]  # straight uptrend -> ER ~ 1
+    gated = decide(
+        _strategies(),
+        _window(prices),
+        symbol=_SYMBOL,
+        ts=_TS,
+        snapshot_id="snap-regime",
+        equity=_EQUITY,
+        risk_engine=_engine(),
+        portfolio_state=_flat_state(),
+        categories=_CATEGORIES,
+    )
+    assert gated.regime is not None
+    assert gated.regime.label == "trending"
+    assert gated.regime.trend_weight > gated.regime.meanrev_weight
+    assert "regime trending" in gated.decision.rationale  # glass-box note in the rationale

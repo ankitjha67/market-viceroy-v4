@@ -23,6 +23,21 @@ from alphakit.strategies.trend.sma_cross_10_30.strategy import SMACross1030
 from alphakit.strategies.trend.sma_cross_50_200.strategy import SMACross50200
 from mv.agents.baseline.runner import SignalStrategy
 
+# Each roster strategy's regime family — the axis the regime-adaptive ensemble
+# weights along ("trend" upweighted in trends, "meanrev" in chop). Kept explicit
+# here (where the roster is curated) rather than read off a loose attribute.
+ROSTER_CATEGORIES: dict[str, str] = {
+    "ema_cross_12_26": "trend",
+    "sma_cross_10_30": "trend",
+    "sma_cross_50_200": "trend",
+    "donchian_breakout_20": "trend",
+    "donchian_breakout_55": "trend",
+    "rsi_reversion_2": "meanrev",
+    "rsi_reversion_14": "meanrev",
+    "bollinger_reversion": "meanrev",
+    "zscore_reversion": "meanrev",
+}
+
 
 def default_crypto_roster() -> list[SignalStrategy]:
     """The default equal-weight crypto paper ensemble (5 trend + 4 mean-reversion).
@@ -71,4 +86,16 @@ def roster_names(roster: list[SignalStrategy]) -> list[str]:
     return [s.name for s in roster]
 
 
-__all__ = ["available_names", "default_crypto_roster", "roster_from_names", "roster_names"]
+def categories_for(roster: list[SignalStrategy]) -> dict[str, str]:
+    """Map each strategy in ``roster`` to its regime family ("trend" | "meanrev")."""
+    return {s.name: ROSTER_CATEGORIES.get(s.name, "trend") for s in roster}
+
+
+__all__ = [
+    "ROSTER_CATEGORIES",
+    "available_names",
+    "categories_for",
+    "default_crypto_roster",
+    "roster_from_names",
+    "roster_names",
+]

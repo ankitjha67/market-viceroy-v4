@@ -10,6 +10,7 @@ NautilusTrader is untyped (Cython/Rust), so its objects are ``Any`` here.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
@@ -61,6 +62,8 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         starting_equity: Decimal,
         hold_threshold: Decimal = Decimal("0.05"),
         live_guard: LiveGuardConfig | None = None,
+        categories: Mapping[str, str] | None = None,
+        regime_adaptive: bool = True,
     ) -> None:
         super().__init__()
         self._instrument = instrument
@@ -74,6 +77,9 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         self._hold_threshold = hold_threshold
         # None = pure paper (unchanged). A live config enforces BR-005 + the cap.
         self._live_guard = live_guard
+        # Regime-adaptive ensemble weighting: when on (default) and categories are
+        # known, the family weights track the detected market regime each bar.
+        self._categories = categories if regime_adaptive else None
         self._closes: list[float] = []
         self._times: list[datetime] = []
         self._position_notional = Decimal("0")
@@ -127,7 +133,8 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
     def _decide(
         self, window: pd.DataFrame, ts: datetime, snapshot_id: str, state: PortfolioState
     ) -> GatedDecision:
-        """Produce the gated decision. The baseline ensembles all strategies."""
+        """Produce the gated decision. The baseline ensembles all strategies,
+        regime-weighting the families when ``categories`` are known."""
         return decide(
             self._strategies,
             window,
@@ -138,10 +145,23 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
             risk_engine=self._risk,
             portfolio_state=state,
             hold_threshold=self._hold_threshold,
+            categories=self._categories,
         )
 
     def _record(self, gated: GatedDecision) -> None:
-        """Journal the per-strategy signals + decision + risk assessment (glass box)."""
+        """Journal the regime + per-strategy signals + decision + risk (glass box)."""
+        if gated.regime is not None:
+            self._journal.append(
+                "regime",
+                {
+                    "snapshot_id": gated.decision.snapshot_id,
+                    "instrument": self._symbol,
+                    "label": gated.regime.label,
+                    "trend_score": f"{gated.regime.trend_score:.4f}",
+                    "trend_weight": f"{gated.regime.trend_weight:.4f}",
+                    "meanrev_weight": f"{gated.regime.meanrev_weight:.4f}",
+                },
+            )
         if gated.signals:
             self._journal.append(
                 "signals",
@@ -245,6 +265,8 @@ def run_paper_session(
     hold_threshold: Decimal = Decimal("0.05"),
     use_agents: bool = False,
     live_guard: LiveGuardConfig | None = None,
+    categories: Mapping[str, str] | None = None,
+    regime_adaptive: bool = True,
 ) -> Any:
     """Run one paper session over ``frame`` and return the engine (for inspection).
 
@@ -271,6 +293,8 @@ def run_paper_session(
         starting_equity=starting_equity,
         hold_threshold=hold_threshold,
         live_guard=live_guard,
+        categories=categories,
+        regime_adaptive=regime_adaptive,
     )
     engine.add_data(bars_from_frame(frame, bar_type, instrument))
     engine.add_strategy(strategy)

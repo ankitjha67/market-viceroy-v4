@@ -138,6 +138,23 @@ describe("LiveDashboard", () => {
     expect(screen.getByText(/No positions/)).toBeInTheDocument();
   });
 
+  it("surfaces the live market regime when adaptive weighting is on", () => {
+    setup({
+      useSettings: polled("loaded", {
+        mode: "paper",
+        decision_engine: "ensemble",
+        symbol: "BTC/USDT",
+        timeframe: "1m",
+        fx_usd_inr: "83",
+        weighting: "regime-adaptive",
+        regime: { label: "trending", trend_score: "0.78", trend_weight: "0.72", meanrev_weight: "0.28" },
+      }),
+    });
+    render(<LiveDashboard />);
+    expect(screen.getAllByText(/trending/i).length).toBeGreaterThan(0); // strip chip + Models tile
+    expect(screen.getByText(/72%/)).toBeInTheDocument(); // live trend weighting
+  });
+
   it("shows a degraded banner on a portfolio error", () => {
     setup({ usePortfolio: polled("error") });
     render(<LiveDashboard />);

@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 from mv.api.roster import (
     available_names,
+    categories_for,
     default_crypto_roster,
     roster_from_names,
     roster_names,
@@ -53,3 +54,13 @@ def test_roster_from_names_selects_subset_and_skips_unknown() -> None:
 
 def test_available_names_matches_default_roster() -> None:
     assert available_names() == roster_names(default_crypto_roster())
+
+
+def test_categories_cover_every_strategy_with_valid_families() -> None:
+    cats = categories_for(default_crypto_roster())
+    # Every roster strategy is classified, into one of the two regime families.
+    assert set(cats) == set(roster_names(default_crypto_roster()))
+    assert set(cats.values()) == {"trend", "meanrev"}
+    # The five trend followers and four mean-reversion strategies.
+    assert sum(1 for v in cats.values() if v == "trend") == 5
+    assert sum(1 for v in cats.values() if v == "meanrev") == 4
