@@ -19,7 +19,14 @@ from mv.postmortem.improvement import (
 from mv.postmortem.metalearn import WeightProposal, propose_weights
 from mv.postmortem.mistakes import Mistake, MistakeContext, classify, mistake_stats
 from mv.postmortem.replay import CounterfactualResult, ReplayVariable, realized_pnl, replay
-from mv.postmortem.trades import ClosedTrade, Fill, fill_from_journal, reconstruct_closed_trades
+from mv.postmortem.trades import (
+    ClosedTrade,
+    Fill,
+    OpenPosition,
+    fill_from_journal,
+    open_positions,
+    reconstruct_closed_trades,
+)
 
 __version__: str = "0.0.1"
 
@@ -32,6 +39,7 @@ __all__ = [
     "ImprovementStore",
     "Mistake",
     "MistakeContext",
+    "OpenPosition",
     "ReplayVariable",
     "TradeAttribution",
     "WeightProposal",
@@ -42,6 +50,7 @@ __all__ = [
     "decompose",
     "fill_from_journal",
     "mistake_stats",
+    "open_positions",
     "propose_weights",
     "realized_pnl",
     "reconstruct_closed_trades",

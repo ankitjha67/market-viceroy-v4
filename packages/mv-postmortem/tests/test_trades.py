@@ -5,7 +5,13 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from mv.postmortem.trades import Fill, fill_from_journal, reconstruct_closed_trades
+from mv.postmortem.trades import (
+    Fill,
+    OpenPosition,
+    fill_from_journal,
+    open_positions,
+    reconstruct_closed_trades,
+)
 
 _T0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
@@ -113,3 +119,30 @@ def test_fill_from_journal_degrades_without_phase5_fields() -> None:
     fill = fill_from_journal({"symbol": "X", "side": "BUY", "qty": "1", "price": "100"}, ts=_T0)
     assert fill.intended_price is None
     assert fill.fees == Decimal("0")
+
+
+def test_open_positions_remainder_after_partial_close() -> None:
+    # BUY 3 @ 100, SELL 1 @ 120 -> 2 still open at the FIFO basis (100).
+    out = open_positions([_fill("BUY", "3", "100"), _fill("SELL", "1", "120", offset=1)])
+    assert out == [
+        OpenPosition(instrument="BTC/USDT", net_qty=Decimal("2"), avg_price=Decimal("100"))
+    ]
+
+
+def test_open_positions_flat_is_empty() -> None:
+    assert open_positions([_fill("BUY", "1", "100"), _fill("SELL", "1", "110", offset=1)]) == []
+
+
+def test_open_positions_quantity_weighted_basis() -> None:
+    # BUY 1 @ 100, BUY 1 @ 200 -> 2 open at the quantity-weighted basis (150).
+    out = open_positions([_fill("BUY", "1", "100"), _fill("BUY", "1", "200", offset=1)])
+    assert out == [
+        OpenPosition(instrument="BTC/USDT", net_qty=Decimal("2"), avg_price=Decimal("150"))
+    ]
+
+
+def test_open_positions_short_is_signed_negative() -> None:
+    out = open_positions([_fill("SELL", "2", "100")])
+    assert out == [
+        OpenPosition(instrument="BTC/USDT", net_qty=Decimal("-2"), avg_price=Decimal("100"))
+    ]
