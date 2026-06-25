@@ -5,6 +5,7 @@ import {
   ColorType,
   createChart,
   type AreaData,
+  type AutoscaleInfo,
   type IChartApi,
   type ISeriesApi,
   type Time,
@@ -66,6 +67,18 @@ export function EquityChart({ points }: { points: HistoryPoint[] }) {
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
+      // Floor the y-axis span so sub-rupee noise reads as flat, not a cliff. A
+      // tiny move on a small book shouldn't auto-zoom into a dramatic step; real
+      // moves (>= ~0.06% of equity) still autoscale normally.
+      autoscaleInfoProvider: (original: () => AutoscaleInfo | null) => {
+        const res = original();
+        if (!res || !res.priceRange) return res;
+        const { minValue, maxValue } = res.priceRange;
+        const mid = (minValue + maxValue) / 2;
+        const floor = Math.max(mid * 0.0006, 0.5);
+        if (maxValue - minValue >= floor) return res;
+        return { ...res, priceRange: { minValue: mid - floor / 2, maxValue: mid + floor / 2 } };
+      },
     });
     chartRef.current = chart;
     seriesRef.current = series;
