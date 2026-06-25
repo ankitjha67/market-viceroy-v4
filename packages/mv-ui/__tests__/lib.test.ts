@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, getJson, killSwitch } from "@/lib/api";
-import { formatMoney, formatPct, signClass } from "@/lib/format";
+import { formatMoney, formatPct, formatTime, signClass } from "@/lib/format";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -52,5 +52,11 @@ describe("format", () => {
     expect(signClass("5")).toBe("pos");
     expect(signClass("-5")).toBe("neg");
     expect(signClass("0")).toBe("");
+  });
+  it("renders time in local zone (YYYY-MM-DD HH:mm:ss ZONE), not raw ISO/UTC", () => {
+    const out = formatTime("2026-06-25T14:00:00+00:00");
+    expect(out).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \S/); // local time + zone label
+    expect(out).not.toMatch(/\dT\d/); // not the raw ISO (which joins date/time with "T")
+    expect(out.endsWith("Z")).toBe(false); // not a bare UTC "Z" suffix
   });
 });
