@@ -54,6 +54,22 @@ export interface OhlcvData {
   markers: ChartMarker[];
 }
 
+/** One closed round trip on the trade blotter (money as strings). */
+export interface TradeRow {
+  id: string;
+  instrument: string;
+  side: "LONG" | "SHORT";
+  qty: string;
+  entry: string;
+  exit: string;
+  pnl: string;
+  fees: string;
+  return_pct: string;
+  opened_at: string;
+  closed_at: string;
+  duration_s: string;
+}
+
 export interface DecisionRow {
   seq: number;
   ts: string;

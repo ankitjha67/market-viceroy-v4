@@ -16,6 +16,7 @@ import {
   useSettings,
   useSourceHealth,
   useStrategies,
+  useTrades,
 } from "@/lib/hooks";
 import { formatMoney, formatNum, formatPct, formatTime, signClass } from "@/lib/format";
 import { StatePanel } from "./StatePanel";
@@ -36,6 +37,7 @@ export function LiveDashboard() {
   const history = useHistory();
   const ohlcv = useOhlcv();
   const metrics = useMetrics();
+  const trades = useTrades();
   const positions = usePositions();
   const decisions = useDecisions();
   const sources = useSourceHealth();
@@ -134,6 +136,46 @@ export function LiveDashboard() {
             <Stat label="Avg win" value={formatMoney(m.avg_win ?? "0")} sign={m.avg_win} />
             <Stat label="Avg loss" value={formatMoney(m.avg_loss ?? "0")} sign={m.avg_loss} />
           </div>
+        </StatePanel>
+      </section>
+
+      <section className={styles.panel} aria-label="Closed trades">
+        <h2 className={styles.panelTitle}>Closed trades</h2>
+        <StatePanel state={trades.state} error="Blotter unavailable." emptyMessage="No closed trades yet.">
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Closed</th>
+                <th>Instrument</th>
+                <th>Side</th>
+                <th className={styles.num}>Entry</th>
+                <th className={styles.num}>Exit</th>
+                <th className={styles.num}>P&amp;L</th>
+                <th className={styles.num}>Return</th>
+                <th className={styles.num}>Held</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trades.data
+                ?.slice()
+                .reverse()
+                .slice(0, 10)
+                .map((t) => (
+                  <tr key={t.id}>
+                    <td className="mono">{formatTime(t.closed_at)}</td>
+                    <td>{t.instrument}</td>
+                    <td className={t.side === "LONG" ? "pos" : "neg"}>{t.side}</td>
+                    <td className={`${styles.num} mono`}>{formatMoney(t.entry)}</td>
+                    <td className={`${styles.num} mono`}>{formatMoney(t.exit)}</td>
+                    <td className={`${styles.num} mono ${signClass(t.pnl)}`}>{formatMoney(t.pnl)}</td>
+                    <td className={`${styles.num} mono ${signClass(t.return_pct)}`}>
+                      {formatPct(t.return_pct)}
+                    </td>
+                    <td className={`${styles.num} mono`}>{fmtDuration(t.duration_s)}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
         </StatePanel>
       </section>
 
@@ -293,6 +335,16 @@ function TileTitle({ href, children }: { href: string; children: ReactNode }) {
       </Link>
     </div>
   );
+}
+
+function fmtDuration(seconds: string): string {
+  const s = Number(seconds);
+  if (!Number.isFinite(s) || s < 0) return "—";
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.round(s / 60)}m`;
+  const h = Math.floor(s / 3600);
+  const min = Math.round((s % 3600) / 60);
+  return min ? `${h}h ${min}m` : `${h}h`;
 }
 
 function Stat({ label, value, sign }: { label: string; value: string; sign?: string }) {

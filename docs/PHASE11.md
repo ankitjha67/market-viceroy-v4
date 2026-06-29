@@ -54,3 +54,16 @@ The deck now reads like a real desk's stats, not three numbers:
 
 Honesty note: these are **session-to-date** stats over paper round trips, distinct
 from a strategy's gated backtest Sharpe. Empty until the first trip closes.
+
+## 11A.3 — Trade blotter (shipped)
+
+The "what did we actually trade" record:
+
+- `mv-api/blotter.py` (pure, tested) — each FIFO-reconstructed closed round trip as
+  a row: direction, qty, entry/exit, net PnL, fees, return, and hold duration.
+- `GET /api/v1/trades` (`ApiState.trades_provider`).
+- `mv-ui` — a **Closed trades** panel on the Command Deck: newest-first table of
+  closed/instrument/side/entry/exit/P&L/return/held.
+
+This completes **11A**. Next: **11B — breadth** (multi-instrument watchlist +
+per-instrument/per-strategy P&L + expanded roster).

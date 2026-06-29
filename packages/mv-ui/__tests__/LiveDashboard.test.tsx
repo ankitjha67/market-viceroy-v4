@@ -8,6 +8,7 @@ vi.mock("@/lib/hooks", () => ({
   useHistory: vi.fn(),
   useOhlcv: vi.fn(),
   useMetrics: vi.fn(),
+  useTrades: vi.fn(),
   usePositions: vi.fn(),
   useDecisions: vi.fn(),
   useSourceHealth: vi.fn(),
@@ -82,6 +83,25 @@ function setup(over: Partial<Record<string, Polled<unknown>>> = {}) {
         avg_win: "8.1",
         avg_loss: "-4.3",
       })) as any,
+  );
+  vi.mocked(hooks.useTrades).mockReturnValue(
+    (over.useTrades ??
+      polled("loaded", [
+        {
+          id: "t1",
+          instrument: "BTC/USDT",
+          side: "LONG",
+          qty: "0.0001",
+          entry: "5300000",
+          exit: "5320000",
+          pnl: "2",
+          fees: "0.1",
+          return_pct: "0.0038",
+          opened_at: "2026-01-01T00:00:00Z",
+          closed_at: "2026-01-01T00:30:00Z",
+          duration_s: "1800",
+        },
+      ])) as any,
   );
   vi.mocked(hooks.usePositions).mockReturnValue(
     (over.usePositions ??
@@ -167,6 +187,8 @@ describe("LiveDashboard", () => {
     expect(screen.getByText("ema_cross_12_26")).toBeInTheDocument();
     expect(screen.getByText("Sharpe")).toBeInTheDocument(); // performance panel
     expect(screen.getByText("Profit factor")).toBeInTheDocument();
+    expect(screen.getByText("Closed trades")).toBeInTheDocument(); // blotter
+    expect(screen.getByText("LONG")).toBeInTheDocument();
   });
 
   it("shows the empty positions message", () => {
