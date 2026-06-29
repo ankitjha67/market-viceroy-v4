@@ -9,6 +9,7 @@ import {
   useImprovements,
   useMetrics,
   useMistakes,
+  useNews,
   useOhlcv,
   usePortfolio,
   usePositions,
@@ -38,6 +39,7 @@ export function LiveDashboard() {
   const ohlcv = useOhlcv();
   const metrics = useMetrics();
   const trades = useTrades();
+  const news = useNews();
   const positions = usePositions();
   const decisions = useDecisions();
   const sources = useSourceHealth();
@@ -179,6 +181,34 @@ export function LiveDashboard() {
                 ))}
             </tbody>
           </table>
+        </StatePanel>
+      </section>
+
+      <section className={styles.panel} aria-label="News and sentiment">
+        <h2 className={styles.panelTitle}>News &amp; sentiment</h2>
+        <StatePanel state={news.state} error="News feed unavailable." emptyMessage="No headlines yet.">
+          <ul className={styles.chips}>
+            {Object.entries(news.data?.sentiment ?? {}).map(([sym, sc]) => (
+              <li key={sym} className={`${styles.chip} ${signClass(sc)}`}>
+                {sym.replace("/USDT", "")} {sc >= 0 ? "+" : ""}
+                {sc.toFixed(2)}
+              </li>
+            ))}
+          </ul>
+          <ul className={styles.feed}>
+            {news.data?.headlines.slice(0, 8).map((h, i) => (
+              <li key={i} className={styles.feedItem}>
+                <span className={`${styles.action} mono ${signClass(h.score)}`}>
+                  {h.score >= 0 ? "+" : ""}
+                  {h.score.toFixed(2)}
+                </span>
+                <span className={styles.rationale}>{h.title}</span>
+                <span className={styles.instrument}>
+                  {h.symbols.map((s) => s.replace("/USDT", "")).join(", ")}
+                </span>
+              </li>
+            ))}
+          </ul>
         </StatePanel>
       </section>
 

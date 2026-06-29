@@ -11,6 +11,7 @@ import type {
   Health,
   HistoryPoint,
   Improvement,
+  NewsData,
   OhlcvData,
   Portfolio,
   Position,
@@ -60,6 +61,9 @@ export const useMetrics = (): Polled<Record<string, string>> =>
 
 export const useTrades = (): Polled<TradeRow[]> =>
   usePolled<TradeRow[]>(ENDPOINTS.trades, (d) => d.length === 0);
+
+export const useNews = (): Polled<NewsData> =>
+  usePolled<NewsData>(ENDPOINTS.news, (d) => d.headlines.length === 0);
 
 export const usePositions = (): Polled<Position[]> =>
   usePolled<Position[]>(ENDPOINTS.positions, (d) => d.length === 0);
