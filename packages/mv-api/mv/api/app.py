@@ -69,6 +69,10 @@ class ApiState:
     source_health_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
     # Live dashboard (Phase 10): the continuous loop's equity-curve time series.
     portfolio_history_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
+    # Price chart (Phase 11): recent INR OHLCV candles + volume + BUY/SELL markers.
+    ohlcv_provider: Callable[[], dict[str, Any]] = field(
+        default=lambda: {"bars": [], "markers": []}
+    )
     # Phase 9 screens: risk limits + exposures, journal search, read-only config.
     risk_provider: Callable[[], dict[str, Any]] = field(default=dict)
     settings_provider: Callable[[], dict[str, Any]] = field(default=dict)
@@ -198,6 +202,11 @@ def create_app(state: ApiState) -> FastAPI:
     def portfolio_history() -> list[dict[str, Any]]:
         """Live equity curve: per-tick {ts, equity, day_pnl, decisions, ...} (Phase 10)."""
         return state.portfolio_history_provider()
+
+    @app.get("/api/v1/ohlcv")
+    def ohlcv() -> dict[str, Any]:
+        """Price chart: recent INR candles + volume + BUY/SELL trade markers (Phase 11)."""
+        return state.ohlcv_provider()
 
     @app.get("/api/v1/health/sources")
     def source_health() -> list[dict[str, Any]]:

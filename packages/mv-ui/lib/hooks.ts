@@ -11,6 +11,7 @@ import type {
   Health,
   HistoryPoint,
   Improvement,
+  OhlcvData,
   Portfolio,
   Position,
   SourceHealthRow,
@@ -49,6 +50,9 @@ export const usePortfolio = (): Polled<Portfolio> =>
 
 export const useHistory = (): Polled<HistoryPoint[]> =>
   usePolled<HistoryPoint[]>(ENDPOINTS.portfolioHistory, (d) => d.length === 0);
+
+export const useOhlcv = (): Polled<OhlcvData> =>
+  usePolled<OhlcvData>(ENDPOINTS.ohlcv, (d) => d.bars.length === 0);
 
 export const usePositions = (): Polled<Position[]> =>
   usePolled<Position[]>(ENDPOINTS.positions, (d) => d.length === 0);

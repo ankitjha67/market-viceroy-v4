@@ -6,6 +6,7 @@ vi.mock("@/lib/hooks", () => ({
   useHealth: vi.fn(),
   usePortfolio: vi.fn(),
   useHistory: vi.fn(),
+  useOhlcv: vi.fn(),
   usePositions: vi.fn(),
   useDecisions: vi.fn(),
   useSourceHealth: vi.fn(),
@@ -16,16 +17,23 @@ vi.mock("@/lib/hooks", () => ({
   useSettings: vi.fn(),
 }));
 
-// EquityChart pulls in lightweight-charts (needs canvas) — mock it.
-vi.mock("lightweight-charts", () => ({
-  ColorType: { Solid: "solid" },
-  createChart: vi.fn(() => ({
-    addAreaSeries: () => ({ setData: vi.fn() }),
-    applyOptions: vi.fn(),
-    timeScale: () => ({ fitContent: vi.fn() }),
-    remove: vi.fn(),
-  })),
-}));
+// EquityChart + PriceChart pull in lightweight-charts (needs canvas) — mock it.
+vi.mock("lightweight-charts", () => {
+  const series = () => ({ setData: vi.fn(), setMarkers: vi.fn(), applyOptions: vi.fn() });
+  return {
+    ColorType: { Solid: "solid" },
+    createChart: vi.fn(() => ({
+      addAreaSeries: series,
+      addCandlestickSeries: series,
+      addHistogramSeries: series,
+      addLineSeries: series,
+      priceScale: () => ({ applyOptions: vi.fn() }),
+      applyOptions: vi.fn(),
+      timeScale: () => ({ fitContent: vi.fn() }),
+      remove: vi.fn(),
+    })),
+  };
+});
 
 import * as hooks from "@/lib/hooks";
 import { LiveDashboard } from "@/components/LiveDashboard";
@@ -48,6 +56,16 @@ function setup(over: Partial<Record<string, Polled<unknown>>> = {}) {
       polled("loaded", [
         { ts: "2026-01-01T00:00:00Z", equity: "5000", day_pnl: "0", decisions: 1, fills: 0, open_positions: 0 },
       ])) as any,
+  );
+  vi.mocked(hooks.useOhlcv).mockReturnValue(
+    (over.useOhlcv ??
+      polled("loaded", {
+        bars: [
+          { time: 1704067200, open: 100, high: 101, low: 99, close: 100.5, volume: 10 },
+          { time: 1704070800, open: 100.5, high: 102, low: 100, close: 101.5, volume: 12 },
+        ],
+        markers: [{ time: 1704070800, side: "BUY", price: "101.5" }],
+      })) as any,
   );
   vi.mocked(hooks.usePositions).mockReturnValue(
     (over.usePositions ??
@@ -126,6 +144,7 @@ describe("LiveDashboard", () => {
     expect(screen.getByRole("heading", { name: "Command Deck" })).toBeInTheDocument();
     expect(screen.getByText(/5,000/)).toBeInTheDocument(); // ₹5,000 equity (en-IN)
     expect(screen.getByRole("img", { name: "Equity curve" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Price chart" })).toBeInTheDocument();
     expect(screen.getAllByText("BTC/USDT").length).toBeGreaterThan(0);
     expect(screen.getByText("BUY")).toBeInTheDocument();
     expect(screen.getByText("ccxt:binance")).toBeInTheDocument();

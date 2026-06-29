@@ -33,6 +33,7 @@ class _ServeState(TypedDict):
     portfolio: dict[str, Any]
     positions: list[dict[str, Any]]
     settings: dict[str, Any]
+    ohlcv: dict[str, Any]
 
 
 def _inr_fallback() -> Decimal:  # pragma: no cover - trivial env read
@@ -203,6 +204,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     import uvicorn
     from mv.api.app import ApiState, create_app
     from mv.api.bars import merge_bars
+    from mv.api.chart import chart_payload
     from mv.api.fx import scale_prices, usd_inr_rate
     from mv.api.learning import mistakes_from_fills
     from mv.api.paper_loop import run_paper_session
@@ -289,6 +291,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     view: _ServeState = {
         "portfolio": portfolio_from_fills([], start_equity),
         "positions": [],
+        "ohlcv": {"bars": [], "markers": []},
         "settings": {
             "mode": "paper",
             "decision_engine": mode,
@@ -350,6 +353,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         positions_provider=lambda: view["positions"],
         portfolio_provider=lambda: view["portfolio"],
         portfolio_history_provider=lambda: history,
+        ohlcv_provider=lambda: view["ohlcv"],
         risk_provider=risk_view,
         source_health_provider=source_health_view,
         mistakes_provider=mistakes_view,
@@ -400,6 +404,8 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         decisions = sum(1 for e in journal.entries() if e.kind == "decision")
         view["portfolio"] = portfolio
         view["positions"] = positions
+        executions = [e.payload for e in journal.entries() if e.kind == "execution"]
+        view["ohlcv"] = chart_payload(frame_inr, executions, max_bars=ns.max_bars)
         regime_entries = [e for e in journal.entries() if e.kind == "regime"]
         latest_regime = regime_entries[-1].payload if regime_entries else None
         view["settings"] = {
