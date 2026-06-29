@@ -77,6 +77,10 @@ class ApiState:
     metrics_provider: Callable[[], dict[str, Any]] = field(default=dict)
     # Trade blotter (Phase 11): the journal's closed round trips as display rows.
     trades_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
+    # News & sentiment (Phase 11): live headlines + per-instrument sentiment.
+    news_provider: Callable[[], dict[str, Any]] = field(
+        default=lambda: {"sentiment": {}, "headlines": []}
+    )
     # Phase 9 screens: risk limits + exposures, journal search, read-only config.
     risk_provider: Callable[[], dict[str, Any]] = field(default=dict)
     settings_provider: Callable[[], dict[str, Any]] = field(default=dict)
@@ -221,6 +225,11 @@ def create_app(state: ApiState) -> FastAPI:
     def trades() -> list[dict[str, Any]]:
         """Trade blotter: closed round trips with entry/exit/P&L/return/duration (Phase 11)."""
         return state.trades_provider()
+
+    @app.get("/api/v1/news")
+    def news() -> dict[str, Any]:
+        """News & sentiment: recent crypto headlines + per-instrument sentiment (Phase 11)."""
+        return state.news_provider()
 
     @app.get("/api/v1/health/sources")
     def source_health() -> list[dict[str, Any]]:

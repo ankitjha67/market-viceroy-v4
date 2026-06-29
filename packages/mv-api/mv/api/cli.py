@@ -219,6 +219,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     from mv.api.instruments import crypto_instrument
     from mv.api.learning import mistakes_from_fills
     from mv.api.metrics import performance_metrics
+    from mv.api.news_feed import fetch_feeds, news_payload
     from mv.api.paper_loop import run_paper_session
     from mv.api.roster import (
         available_names,
@@ -316,6 +317,17 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     history: list[dict[str, Any]] = []
     working_frames: dict[str, pl.DataFrame] = {}
     peak_equity = start_equity
+    news_state: dict[str, Any] = {"sentiment": {}, "headlines": []}
+
+    def refresh_news() -> None:
+        # Live crypto news -> per-instrument sentiment. Network + slow-moving, so
+        # the loop refreshes it every few ticks, not every bar; a failure is
+        # non-fatal (the last snapshot stays).
+        try:
+            news_state.clear()
+            news_state.update(news_payload(fetch_feeds(), symbols))
+        except Exception as exc:  # news must never break serving
+            print(f"[serve] news refresh skipped: {type(exc).__name__}: {exc}")
 
     limits = risk.limits
     live_strategies = ", ".join(roster_names(strategies))
@@ -408,6 +420,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         ohlcv_provider=lambda: view["ohlcv"],
         metrics_provider=metrics_view,
         trades_provider=trades_view,
+        news_provider=lambda: news_state,
         risk_provider=risk_view,
         source_health_provider=source_health_view,
         mistakes_provider=mistakes_view,
@@ -508,6 +521,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         )
 
     run_tick()  # populate before serving
+    refresh_news()  # initial news pull
 
     if ns.watch:
 
@@ -524,6 +538,8 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
                     if ticks % 30 == 0:  # refresh the (daily) FX rate periodically
                         fx_rate = usd_inr_rate(router, fallback=_inr_fallback())
                     run_tick()
+                    if ticks % 5 == 0:  # news moves slower than bars
+                        refresh_news()
                 except Exception as exc:  # one bad tick must not kill the server
                     print(f"[serve] tick error: {type(exc).__name__}: {exc}")
 

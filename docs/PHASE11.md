@@ -91,3 +91,24 @@ a ₹5,000 book), so the default is a broad liquid set and `--symbols` takes any
 list. More symbols = a heavier tick.
 
 Next: **11B.2** — a chart symbol-selector + a per-instrument P&L/exposure panel.
+
+## 11N.1 — Live news + sentiment (shipped)
+
+The Phase-3 news/sentiment machinery existed but was never wired into the running
+platform (offline feature-store only; the agents' news analyst degraded to
+neutral). This connects the live wire:
+
+- `mv-api/news_feed.py` (pure mapping/scoring tested; fetch network-gated) —
+  fetches free crypto RSS (CoinDesk / CoinTelegraph / Decrypt), maps each headline
+  to the watchlist instruments it names (conservative full-name + whole-word
+  ticker matching), scores it with the Phase-3 lexicon (point-in-time by publish
+  time), and aggregates a **per-instrument sentiment**.
+- `mv-serve` refreshes news every ~5 ticks (slower than bars; a failure is
+  non-fatal); `GET /api/v1/news` (`ApiState.news_provider`).
+- `mv-ui` — a **News & sentiment** panel on the Command Deck: per-instrument
+  sentiment chips + a scored headline feed.
+
+Still informational (does not yet drive decisions). Follow-ons: **11N.2** feed the
+`news_sentiment` feature to the agent pipeline (so `--agents` mode uses it), and
+**11N.3** swap the lexicon for the FinBERT transformer (offline torch extra,
+lexicon fallback).

@@ -54,6 +54,19 @@ export interface OhlcvData {
   markers: ChartMarker[];
 }
 
+/** One scored news headline + the watchlist symbols it names. */
+export interface NewsHeadline {
+  title: string;
+  score: number;
+  ts: string;
+  symbols: string[];
+}
+
+export interface NewsData {
+  sentiment: Record<string, number>;
+  headlines: NewsHeadline[];
+}
+
 /** One closed round trip on the trade blotter (money as strings). */
 export interface TradeRow {
   id: string;

@@ -16,6 +16,7 @@ dependencies = [
     "alphakit-bridges",
     "mv-agents",
     "mv-failover",
+    "mv-intelligence",
     "mv-journal",
     "mv-postmortem",
     "mv-risk",

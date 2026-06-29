@@ -9,6 +9,7 @@ vi.mock("@/lib/hooks", () => ({
   useOhlcv: vi.fn(),
   useMetrics: vi.fn(),
   useTrades: vi.fn(),
+  useNews: vi.fn(),
   usePositions: vi.fn(),
   useDecisions: vi.fn(),
   useSourceHealth: vi.fn(),
@@ -103,6 +104,20 @@ function setup(over: Partial<Record<string, Polled<unknown>>> = {}) {
         },
       ])) as any,
   );
+  vi.mocked(hooks.useNews).mockReturnValue(
+    (over.useNews ??
+      polled("loaded", {
+        sentiment: { "BTC/USDT": 0.21, "SOL/USDT": -0.18 },
+        headlines: [
+          {
+            title: "Bitcoin surges to a record high",
+            score: 0.42,
+            ts: "2026-01-01T00:00:00Z",
+            symbols: ["BTC/USDT"],
+          },
+        ],
+      })) as any,
+  );
   vi.mocked(hooks.usePositions).mockReturnValue(
     (over.usePositions ??
       polled("loaded", [
@@ -192,6 +207,8 @@ describe("LiveDashboard", () => {
     expect(screen.getByText("Closed trades")).toBeInTheDocument(); // blotter
     expect(screen.getByText("LONG")).toBeInTheDocument();
     expect(screen.getByText("3 markets")).toBeInTheDocument(); // multi-instrument watchlist
+    expect(screen.getByText("News & sentiment")).toBeInTheDocument();
+    expect(screen.getByText("Bitcoin surges to a record high")).toBeInTheDocument();
   });
 
   it("shows the empty positions message", () => {
