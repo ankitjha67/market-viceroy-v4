@@ -32,6 +32,28 @@ export interface Position {
   pnl: string;
 }
 
+/** One candle on the price chart (epoch-second time, INR prices). */
+export interface OhlcvBar {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+/** A BUY/SELL marker placed on the candle where an order filled. */
+export interface ChartMarker {
+  time: number;
+  side: "BUY" | "SELL";
+  price: string;
+}
+
+export interface OhlcvData {
+  bars: OhlcvBar[];
+  markers: ChartMarker[];
+}
+
 export interface DecisionRow {
   seq: number;
   ts: string;

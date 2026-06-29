@@ -84,6 +84,7 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         self._times: list[datetime] = []
         self._position_notional = Decimal("0")
         self._last_price = Decimal("0")
+        self._last_ts = datetime.fromtimestamp(0, tz=timezone.utc)  # the latest bar's time
 
     def on_start(self) -> None:
         self.subscribe_bars(self._bar_type)
@@ -92,6 +93,7 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         close = bar.close.as_double()
         self._last_price = Decimal(str(close))
         ts = _ns_to_dt(bar.ts_event)
+        self._last_ts = ts
         self._closes.append(close)
         self._times.append(ts)
         if len(self._closes) < self._warmup:
@@ -218,6 +220,7 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
                 "decision_ref_price": str(intended),
                 "fees": str(fees),
                 "slippage_bps": slippage_bps,
+                "bar_ts": self._last_ts.isoformat(),  # the bar the fill landed on (chart marker)
             },
         )
 

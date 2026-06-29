@@ -8,6 +8,7 @@ import {
   useHistory,
   useImprovements,
   useMistakes,
+  useOhlcv,
   usePortfolio,
   usePositions,
   useRiskLimits,
@@ -19,6 +20,7 @@ import { formatMoney, formatPct, formatTime, signClass } from "@/lib/format";
 import { StatePanel } from "./StatePanel";
 import { KillSwitch } from "./KillSwitch";
 import { EquityChart } from "./EquityChart";
+import { PriceChart } from "./PriceChart";
 import styles from "./LiveDashboard.module.css";
 
 /**
@@ -31,6 +33,7 @@ export function LiveDashboard() {
   const health = useHealth();
   const portfolio = usePortfolio();
   const history = useHistory();
+  const ohlcv = useOhlcv();
   const positions = usePositions();
   const decisions = useDecisions();
   const sources = useSourceHealth();
@@ -85,6 +88,20 @@ export function LiveDashboard() {
             <div className={`${styles.statValue} mono`}>{p ? formatPct(p.drawdown) : ""}</div>
             <DrawdownGauge severity={ddSeverity} />
           </div>
+        </StatePanel>
+      </section>
+
+      <section className={styles.panel} aria-label="Price chart">
+        <div className={styles.tileHead}>
+          <h2 className={styles.panelTitle}>Price &amp; trades — {symbol}</h2>
+          <span className={styles.note}>candles · EMA12 · EMA26 · volume · ▲ buy / ▼ sell</span>
+        </div>
+        <StatePanel
+          state={ohlcv.state}
+          error="Price feed unavailable."
+          emptyMessage="Waiting for bars…"
+        >
+          <PriceChart data={ohlcv.data ?? { bars: [], markers: [] }} />
         </StatePanel>
       </section>
 

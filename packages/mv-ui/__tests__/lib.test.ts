@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, getJson, killSwitch } from "@/lib/api";
 import { formatMoney, formatPct, formatTime, signClass } from "@/lib/format";
+import { ema } from "@/lib/indicators";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -53,6 +54,14 @@ describe("format", () => {
     expect(signClass("-5")).toBe("neg");
     expect(signClass("0")).toBe("");
   });
+  it("computes an EMA with a null warmup then tracks the series", () => {
+    const out = ema([1, 2, 3, 4, 5], 3);
+    expect(out.slice(0, 2)).toEqual([null, null]); // warmup < span
+    expect(out[2]).not.toBeNull();
+    expect(typeof out[4]).toBe("number");
+    expect(ema([], 3)).toEqual([]);
+  });
+
   it("renders time in local zone (YYYY-MM-DD HH:mm:ss ZONE), not raw ISO/UTC", () => {
     const out = formatTime("2026-06-25T14:00:00+00:00");
     expect(out).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \S/); // local time + zone label
