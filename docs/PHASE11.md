@@ -37,3 +37,20 @@ equity line:
 Gates: `ruff` + `mypy --strict` (full tree) + backend tests (`chart` + loop
 `bar_ts`); `tsc` + `eslint` + `vitest` (PriceChart + EMA + dashboard) +
 `next build`.
+
+## 11A.2 — Live performance metrics panel (shipped)
+
+The deck now reads like a real desk's stats, not three numbers:
+
+- `mv-api/metrics.py` (pure, tested) — two honest sources, kept separate from the
+  backtest/validation Sharpe (that stays the Strategy Lab gate): **trade stats**
+  over the journal's closed round trips (win rate, profit factor, expectancy, avg
+  and largest win/loss, a per-trade Sharpe/Sortino) and **equity-curve risk** over
+  the live session (max drawdown, total return). Stdlib only; money `Decimal`.
+- `GET /api/v1/metrics` (`ApiState.metrics_provider`) — recomputed each tick from
+  the equity history + closed trades.
+- `mv-ui` — a **Performance** panel on the Command Deck: Sharpe, Sortino, win rate,
+  profit factor, expectancy, total P&L, max drawdown, trades, avg win/loss.
+
+Honesty note: these are **session-to-date** stats over paper round trips, distinct
+from a strategy's gated backtest Sharpe. Empty until the first trip closes.

@@ -73,6 +73,8 @@ class ApiState:
     ohlcv_provider: Callable[[], dict[str, Any]] = field(
         default=lambda: {"bars": [], "markers": []}
     )
+    # Performance panel (Phase 11): live trade stats + equity-curve risk metrics.
+    metrics_provider: Callable[[], dict[str, Any]] = field(default=dict)
     # Phase 9 screens: risk limits + exposures, journal search, read-only config.
     risk_provider: Callable[[], dict[str, Any]] = field(default=dict)
     settings_provider: Callable[[], dict[str, Any]] = field(default=dict)
@@ -207,6 +209,11 @@ def create_app(state: ApiState) -> FastAPI:
     def ohlcv() -> dict[str, Any]:
         """Price chart: recent INR candles + volume + BUY/SELL trade markers (Phase 11)."""
         return state.ohlcv_provider()
+
+    @app.get("/api/v1/metrics")
+    def metrics() -> dict[str, Any]:
+        """Performance panel: trade stats (win rate / profit factor / …) + risk (Phase 11)."""
+        return state.metrics_provider()
 
     @app.get("/api/v1/health/sources")
     def source_health() -> list[dict[str, Any]]:

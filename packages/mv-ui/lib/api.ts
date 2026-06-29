@@ -49,6 +49,7 @@ export const ENDPOINTS = {
   portfolio: "/api/v1/portfolio",
   portfolioHistory: "/api/v1/portfolio/history",
   ohlcv: "/api/v1/ohlcv",
+  metrics: "/api/v1/metrics",
   positions: "/api/v1/positions",
   decisions: "/api/v1/decisions",
   sourceHealth: "/api/v1/health/sources",
