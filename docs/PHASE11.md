@@ -65,5 +65,29 @@ The "what did we actually trade" record:
 - `mv-ui` — a **Closed trades** panel on the Command Deck: newest-first table of
   closed/instrument/side/entry/exit/P&L/return/held.
 
-This completes **11A**. Next: **11B — breadth** (multi-instrument watchlist +
-per-instrument/per-strategy P&L + expanded roster).
+This completes **11A**.
+
+## 11B.1 — Multi-instrument engine (shipped)
+
+The loop is no longer single-symbol. It trades a **watchlist concurrently**:
+
+- `mv-api/instruments.py` (tested) — `crypto_instrument(symbol)` builds a Binance
+  `CurrencyPair` for any `BASE/USDT` from NautilusTrader's currency registry, so
+  the loop is no longer pinned to the BTC/USDT test preset.
+- `mv-serve --symbols` — a default watchlist of 11 liquid USDT majors (BTC, ETH,
+  SOL, BNB, XRP, ADA, DOGE, AVAX, LINK, DOT, LTC), fully overridable. Each tick
+  runs a paper session **per symbol into one shared journal** with the capital
+  split across symbols (`start_equity / n` per slice); a bad/illiquid symbol is
+  skipped for that tick without breaking the others.
+- Because everything lands in one journal **tagged by instrument**, the existing
+  snapshot / metrics / blotter helpers **aggregate across the book automatically**
+  — the positions table now shows a row per instrument, equity sums across them,
+  and the blotter spans all symbols. The price chart focuses on `--symbol` (its
+  candles + its own fills); the regime chip reflects that symbol.
+- `mv-ui` — the mode strip shows an `N markets` chip (the watchlist).
+
+Note: every pair on the exchange is impractical (rate limits + dust positions on
+a ₹5,000 book), so the default is a broad liquid set and `--symbols` takes any
+list. More symbols = a heavier tick.
+
+Next: **11B.2** — a chart symbol-selector + a per-instrument P&L/exposure panel.

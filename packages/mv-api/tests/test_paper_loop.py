@@ -14,6 +14,7 @@ from alphakit.strategies.trend.donchian_breakout_20 import DonchianBreakout20
 from alphakit.strategies.trend.ema_cross_12_26 import EMACross1226
 from alphakit.strategies.trend.sma_cross_10_30 import SMACross1030
 from mv.agents.baseline.runner import SignalStrategy
+from mv.api.instruments import crypto_instrument
 from mv.api.paper_loop import run_paper_session
 from mv.failover.normalize import normalize_ohlcv
 from mv.journal.journal import Journal
@@ -126,6 +127,32 @@ def test_regime_adaptive_loop_journals_the_detected_regime() -> None:
         assert float(last["trend_weight"]) > float(last["meanrev_weight"])
     finally:
         engine.dispose()
+
+
+def test_multi_instrument_shared_journal_aggregates() -> None:
+    # The 11B multi-instrument loop runs a session per symbol into ONE journal,
+    # with a generically-built instrument per pair; fills are tagged by symbol so
+    # the snapshot/metrics aggregate across the book.
+    journal = Journal()
+    risk = RiskEngine(RiskLimits.aggressive(), KillSwitch())
+    for sym in ("BTC/USDT", "ETH/USDT"):
+        run_paper_session(
+            frame=_rising_frame(60),
+            symbol=sym,
+            timeframe="1h",
+            strategies=_strategies(),
+            risk_engine=risk,
+            journal=journal,  # shared across symbols
+            instrument=crypto_instrument(sym),
+            warmup=30,
+            starting_equity=Decimal("2500"),  # the per-symbol slice
+            categories=_CATEGORIES,
+        ).dispose()
+    decided = {e.payload["instrument"] for e in journal.entries() if e.kind == "decision"}
+    assert decided == {"BTC/USDT", "ETH/USDT"}  # both symbols traded into one book
+    executed = {e.payload["symbol"] for e in journal.entries() if e.kind == "execution"}
+    assert executed == {"BTC/USDT", "ETH/USDT"}  # fills tagged per instrument
+    journal.verify()  # the shared hash chain stays intact
 
 
 def test_static_weights_loop_records_no_regime() -> None:

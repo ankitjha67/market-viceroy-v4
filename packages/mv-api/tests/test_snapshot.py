@@ -67,6 +67,28 @@ def test_positions_flat_is_omitted() -> None:
     assert rows == []
 
 
+def _fill_sym(instrument: str, side: str, qty: str, price: str) -> Fill:
+    return Fill(
+        instrument=instrument, side=side, qty=Decimal(qty), fill_price=Decimal(price), ts=_TS
+    )
+
+
+def test_positions_and_portfolio_aggregate_across_instruments() -> None:
+    # The multi-instrument loop journals all symbols into one book; the snapshot
+    # nets per instrument and the portfolio sums across them.
+    fills = [
+        _fill_sym("BTC/USDT", "BUY", "1", "100"),
+        _fill_sym("ETH/USDT", "BUY", "2", "50"),
+    ]
+    marks = {"BTC/USDT": Decimal("110"), "ETH/USDT": Decimal("60")}
+    rows = positions_from_fills(fills, marks=marks)
+    assert {r["instrument"] for r in rows} == {"BTC/USDT", "ETH/USDT"}
+    p = portfolio_from_fills(fills, Decimal("1000"), marks=marks)
+    # unrealized: BTC (110-100)*1 = 10 + ETH (60-50)*2 = 20 -> 30
+    assert p["equity"] == "1030"
+    assert p["day_pnl"] == "30"
+
+
 def test_positions_marked_to_live_price_not_entry() -> None:
     # A single open lot: without a live mark the old code showed mark == entry and
     # pnl 0 (the frozen-dashboard bug). With the live mark it reflects the market.
