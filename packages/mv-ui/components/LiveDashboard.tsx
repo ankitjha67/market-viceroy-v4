@@ -76,6 +76,9 @@ export function LiveDashboard() {
             <span>paper</span>
             <span>{engine}</span>
             <span className="mono">{symbol}</span>
+            {Number(s.n_instruments ?? 0) > 1 && (
+              <span title={String(s.watchlist ?? "")}>{String(s.n_instruments)} markets</span>
+            )}
             <span className="mono">{timeframe}</span>
             {fx && <span className="mono">{fx}</span>}
             {regime && <span>regime: {regime.label}</span>}

@@ -36,6 +36,15 @@ class _ServeState(TypedDict):
     ohlcv: dict[str, Any]
 
 
+# The default multi-instrument watchlist — liquid Binance USDT majors traded
+# concurrently. Override with --symbols; literally every pair is impractical
+# (rate limits + dust positions on a small book), so this is a sane broad set.
+_DEFAULT_WATCHLIST = (
+    "BTC/USDT,ETH/USDT,SOL/USDT,BNB/USDT,XRP/USDT,ADA/USDT,"
+    "DOGE/USDT,AVAX/USDT,LINK/USDT,DOT/USDT,LTC/USDT"
+)
+
+
 def _inr_fallback() -> Decimal:  # pragma: no cover - trivial env read
     """Offline USD->INR fallback rate, Operator-tunable via ``MV_USD_INR_FALLBACK``."""
     try:
@@ -92,6 +101,7 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     import argparse
 
     from mv.api.fx import scale_prices, usd_inr_rate
+    from mv.api.instruments import crypto_instrument
     from mv.api.paper_loop import run_paper_session
     from mv.api.roster import (
         available_names,
@@ -101,7 +111,6 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     )
     from mv.postmortem.trades import fill_from_journal, reconstruct_closed_trades
     from mv.risk.engine import RiskEngine
-    from nautilus_trader.test_kit.providers import TestInstrumentProvider
 
     parser = argparse.ArgumentParser(
         prog="mv-paper", description="Run one paper session on live crypto bars (values in INR)."
@@ -138,7 +147,7 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     kill = _kill_switch_for(settings, allow_in_memory=True)
     risk = RiskEngine(RiskLimits.aggressive(), kill)
     journal = Journal()
-    instrument = TestInstrumentProvider.btcusdt_binance()
+    instrument = crypto_instrument(ns.symbol)
     strategies = (
         roster_from_names(ns.strategies.split(",")) if ns.strategies else default_crypto_roster()
     )
@@ -207,6 +216,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     from mv.api.blotter import trade_rows
     from mv.api.chart import chart_payload
     from mv.api.fx import scale_prices, usd_inr_rate
+    from mv.api.instruments import crypto_instrument
     from mv.api.learning import mistakes_from_fills
     from mv.api.metrics import performance_metrics
     from mv.api.paper_loop import run_paper_session
@@ -220,12 +230,16 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     from mv.api.snapshot import portfolio_from_fills, positions_from_fills
     from mv.postmortem.trades import fill_from_journal, reconstruct_closed_trades
     from mv.risk.engine import RiskEngine
-    from nautilus_trader.test_kit.providers import TestInstrumentProvider
 
     parser = argparse.ArgumentParser(
         prog="mv-serve", description="Run paper sessions on live crypto bars and serve the API."
     )
-    parser.add_argument("--symbol", default="BTC/USDT")
+    parser.add_argument("--symbol", default="BTC/USDT", help="the chart's focus symbol")
+    parser.add_argument(
+        "--symbols",
+        default=_DEFAULT_WATCHLIST,
+        help="comma-separated watchlist of BASE/USDT pairs traded concurrently",
+    )
     parser.add_argument("--timeframe", default="1h")
     parser.add_argument("--limit", type=int, default=200, help="bars to pull from the governor")
     parser.add_argument(
@@ -263,7 +277,6 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     router = DataSourceRouter(registry)
     kill = _kill_switch_for(settings, allow_in_memory=True)
     risk = RiskEngine(RiskLimits.aggressive(), kill)
-    instrument = TestInstrumentProvider.btcusdt_binance()
     strategies = (
         roster_from_names(ns.strategies.split(",")) if ns.strategies else default_crypto_roster()
     )
@@ -271,19 +284,37 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         raise SystemExit(
             f"mv-serve: --strategies matched none; valid: {', '.join(available_names())}"
         )
+    # The watchlist: build a NautilusTrader instrument per symbol, skipping any
+    # pair the currency registry rejects. All symbols trade concurrently into one
+    # shared journal, so the snapshot/metrics/blotter helpers aggregate by
+    # instrument automatically.
+    symbols: list[str] = []
+    instruments: dict[str, Any] = {}
+    for sym in (s.strip() for s in ns.symbols.split(",")):
+        if not sym:
+            continue
+        try:
+            instruments[sym] = crypto_instrument(sym)
+            symbols.append(sym)
+        except ValueError as exc:
+            print(f"[serve] skipping {sym}: {exc}")
+    if not symbols:
+        raise SystemExit("mv-serve: --symbols matched no valid BASE/USDT pairs")
+    chart_symbol = ns.symbol if ns.symbol in symbols else symbols[0]
     categories = categories_for(strategies)
     regime_adaptive = not ns.static_weights
-    start_equity = Decimal("5000")  # INR
+    start_equity = Decimal("5000")  # INR — the whole book
+    per_symbol_equity = start_equity / len(symbols)  # the sizing slice per instrument
     mode = "agents" if ns.agents else "ensemble"
     fx_rate = usd_inr_rate(
         router, fallback=_inr_fallback()
     )  # live USD->INR via the FX governor; fixed fallback offline
 
-    # Time series for the live equity curve, and the growing bar window (anchored
+    # Time series for the live equity curve + per-symbol growing windows (anchored
     # at launch) so equity accumulates from ₹5000 as new bars close. ``peak_equity``
     # is the running high-water mark threaded across ticks for an honest drawdown.
     history: list[dict[str, Any]] = []
-    working_frame: pl.DataFrame | None = None
+    working_frames: dict[str, pl.DataFrame] = {}
     peak_equity = start_equity
 
     limits = risk.limits
@@ -298,7 +329,9 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             "mode": "paper",
             "decision_engine": mode,
             "live_strategies": live_strategies,
-            "symbol": ns.symbol,
+            "symbol": chart_symbol,
+            "watchlist": ", ".join(symbols),
+            "n_instruments": len(symbols),
             "timeframe": ns.timeframe,
             "currency": "INR",
             "fx_usd_inr": str(fx_rate),
@@ -382,57 +415,77 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     )
 
     def run_tick() -> None:
-        """Grow the window with the latest bars, run a paper session in INR, swap the view."""
-        nonlocal working_frame, peak_equity
-        fresh = router.get_bars(CRYPTO_PRICES, ns.symbol, ns.timeframe, limit=ns.limit)
-        working_frame = (
-            fresh.frame
-            if working_frame is None
-            else merge_bars(working_frame, fresh.frame, max_bars=ns.max_bars)
-        )
-        frame_inr = scale_prices(working_frame, fx_rate)
-        # The live mark = the latest INR close; open positions mark to it so equity
-        # and P&L move with the market instead of sitting frozen at the entry.
-        marks = (
-            {ns.symbol: Decimal(str(frame_inr.get_column("close").tail(1).item()))}
-            if frame_inr.height
-            else {}
-        )
+        """Run a paper session per watchlist symbol into one shared journal, then
+        swap the aggregated view (equity / positions / metrics span all symbols)."""
+        nonlocal peak_equity
         journal = Journal()
-        engine = run_paper_session(
-            frame=frame_inr,
-            symbol=ns.symbol,
-            timeframe=ns.timeframe,
-            strategies=strategies,
-            risk_engine=risk,
-            journal=journal,
-            instrument=instrument,
-            warmup=30,
-            starting_equity=start_equity,
-            use_agents=ns.agents,
-            categories=categories,
-            regime_adaptive=regime_adaptive,
-        )
-        engine.dispose()
-        fills = [
-            fill_from_journal(e.payload, ts=e.ts)
-            for e in journal.entries()
-            if e.kind == "execution"
-        ]
+        marks: dict[str, Decimal] = {}
+        frames_inr: dict[str, pl.DataFrame] = {}
+        source = ""
+        for sym in symbols:
+            try:
+                fresh = router.get_bars(CRYPTO_PRICES, sym, ns.timeframe, limit=ns.limit)
+                source = fresh.source
+                working_frames[sym] = (
+                    fresh.frame
+                    if sym not in working_frames
+                    else merge_bars(working_frames[sym], fresh.frame, max_bars=ns.max_bars)
+                )
+                frame_inr = scale_prices(working_frames[sym], fx_rate)
+                frames_inr[sym] = frame_inr
+                if frame_inr.height:
+                    marks[sym] = Decimal(str(frame_inr.get_column("close").tail(1).item()))
+                run_paper_session(
+                    frame=frame_inr,
+                    symbol=sym,
+                    timeframe=ns.timeframe,
+                    strategies=strategies,
+                    risk_engine=risk,
+                    journal=journal,
+                    instrument=instruments[sym],
+                    warmup=30,
+                    starting_equity=per_symbol_equity,
+                    use_agents=ns.agents,
+                    categories=categories,
+                    regime_adaptive=regime_adaptive,
+                ).dispose()
+            except Exception as exc:  # one bad/illiquid symbol must not break the tick
+                print(f"[serve] {sym} skipped this tick: {type(exc).__name__}: {exc}")
+                continue
+
+        entries = list(journal.entries())
+        fills = [fill_from_journal(e.payload, ts=e.ts) for e in entries if e.kind == "execution"]
         portfolio = portfolio_from_fills(fills, start_equity, marks=marks, peak_equity=peak_equity)
         positions = positions_from_fills(fills, marks=marks)
         peak_equity = Decimal(portfolio["peak_equity"])
-        decisions = sum(1 for e in journal.entries() if e.kind == "decision")
+        decisions = sum(1 for e in entries if e.kind == "decision")
+
+        # The price chart focuses on one symbol — its candles + its own fills.
+        chart_execs = [
+            e.payload
+            for e in entries
+            if e.kind == "execution" and e.payload.get("symbol") == chart_symbol
+        ]
+        chart_frame = frames_inr.get(chart_symbol)
+        ohlcv = (
+            chart_payload(chart_frame, chart_execs, max_bars=ns.max_bars)
+            if chart_frame is not None
+            else {"bars": [], "markers": []}
+        )
+        # The regime chip reflects the chart symbol's latest detected regime.
+        regimes = [
+            e.payload
+            for e in entries
+            if e.kind == "regime" and e.payload.get("instrument") == chart_symbol
+        ]
+
         view["portfolio"] = portfolio
         view["positions"] = positions
-        executions = [e.payload for e in journal.entries() if e.kind == "execution"]
-        view["ohlcv"] = chart_payload(frame_inr, executions, max_bars=ns.max_bars)
-        regime_entries = [e for e in journal.entries() if e.kind == "regime"]
-        latest_regime = regime_entries[-1].payload if regime_entries else None
+        view["ohlcv"] = ohlcv
         view["settings"] = {
             **view["settings"],
-            "source": fresh.source,
-            "regime": latest_regime,
+            "source": source,
+            "regime": regimes[-1] if regimes else None,
         }
         state.journal = journal  # atomic swap; request handlers read the latest
         stamp = datetime.now(timezone.utc)
@@ -449,8 +502,9 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         if len(history) > ns.max_bars:
             del history[: len(history) - ns.max_bars]
         print(
-            f"[serve {stamp:%H:%M:%S}] {ns.symbol} {ns.timeframe} via {fresh.source} ({mode}): "
-            f"{decisions} decisions, {len(fills)} fills, equity ₹{portfolio['equity']}"
+            f"[serve {stamp:%H:%M:%S}] {len(symbols)} symbols {ns.timeframe} via {source} "
+            f"({mode}): {decisions} decisions, {len(fills)} fills, "
+            f"{len(positions)} positions, equity ₹{portfolio['equity']}"
         )
 
     run_tick()  # populate before serving

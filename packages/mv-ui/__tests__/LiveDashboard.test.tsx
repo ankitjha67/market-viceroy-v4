@@ -167,6 +167,8 @@ function setup(over: Partial<Record<string, Polled<unknown>>> = {}) {
         symbol: "BTC/USDT",
         timeframe: "1m",
         fx_usd_inr: "83",
+        n_instruments: 3,
+        watchlist: "BTC/USDT, ETH/USDT, SOL/USDT",
       })) as any,
   );
 }
@@ -189,6 +191,7 @@ describe("LiveDashboard", () => {
     expect(screen.getByText("Profit factor")).toBeInTheDocument();
     expect(screen.getByText("Closed trades")).toBeInTheDocument(); // blotter
     expect(screen.getByText("LONG")).toBeInTheDocument();
+    expect(screen.getByText("3 markets")).toBeInTheDocument(); // multi-instrument watchlist
   });
 
   it("shows the empty positions message", () => {
