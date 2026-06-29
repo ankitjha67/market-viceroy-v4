@@ -75,6 +75,8 @@ class ApiState:
     )
     # Performance panel (Phase 11): live trade stats + equity-curve risk metrics.
     metrics_provider: Callable[[], dict[str, Any]] = field(default=dict)
+    # Trade blotter (Phase 11): the journal's closed round trips as display rows.
+    trades_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
     # Phase 9 screens: risk limits + exposures, journal search, read-only config.
     risk_provider: Callable[[], dict[str, Any]] = field(default=dict)
     settings_provider: Callable[[], dict[str, Any]] = field(default=dict)
@@ -214,6 +216,11 @@ def create_app(state: ApiState) -> FastAPI:
     def metrics() -> dict[str, Any]:
         """Performance panel: trade stats (win rate / profit factor / …) + risk (Phase 11)."""
         return state.metrics_provider()
+
+    @app.get("/api/v1/trades")
+    def trades() -> list[dict[str, Any]]:
+        """Trade blotter: closed round trips with entry/exit/P&L/return/duration (Phase 11)."""
+        return state.trades_provider()
 
     @app.get("/api/v1/health/sources")
     def source_health() -> list[dict[str, Any]]:

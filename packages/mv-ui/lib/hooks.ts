@@ -16,6 +16,7 @@ import type {
   Position,
   SourceHealthRow,
   Strategy,
+  TradeRow,
 } from "./types";
 import type { LoadState } from "@/components/StatePanel";
 
@@ -56,6 +57,9 @@ export const useOhlcv = (): Polled<OhlcvData> =>
 
 export const useMetrics = (): Polled<Record<string, string>> =>
   usePolled<Record<string, string>>(ENDPOINTS.metrics, (d) => Object.keys(d).length === 0);
+
+export const useTrades = (): Polled<TradeRow[]> =>
+  usePolled<TradeRow[]>(ENDPOINTS.trades, (d) => d.length === 0);
 
 export const usePositions = (): Polled<Position[]> =>
   usePolled<Position[]>(ENDPOINTS.positions, (d) => d.length === 0);

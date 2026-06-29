@@ -204,6 +204,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     import uvicorn
     from mv.api.app import ApiState, create_app
     from mv.api.bars import merge_bars
+    from mv.api.blotter import trade_rows
     from mv.api.chart import chart_payload
     from mv.api.fx import scale_prices, usd_inr_rate
     from mv.api.learning import mistakes_from_fills
@@ -347,15 +348,22 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         ]
         return mistakes_from_fills(fills)
 
-    def metrics_view() -> dict[str, Any]:
-        # Live performance panel: trade stats + equity-curve risk (Phase 11).
-        equity_curve = [Decimal(str(point["equity"])) for point in history]
+    def _closed_trades() -> list[Any]:
         fills = [
             fill_from_journal(e.payload, ts=e.ts)
             for e in state.journal.entries()
             if e.kind == "execution"
         ]
-        return performance_metrics(equity_curve, reconstruct_closed_trades(fills))
+        return reconstruct_closed_trades(fills)
+
+    def metrics_view() -> dict[str, Any]:
+        # Live performance panel: trade stats + equity-curve risk (Phase 11).
+        equity_curve = [Decimal(str(point["equity"])) for point in history]
+        return performance_metrics(equity_curve, _closed_trades())
+
+    def trades_view() -> list[dict[str, Any]]:
+        # Trade blotter: the journal's closed round trips (Phase 11).
+        return trade_rows(_closed_trades())
 
     state = ApiState(
         kill_switch=kill,
@@ -366,6 +374,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         portfolio_history_provider=lambda: history,
         ohlcv_provider=lambda: view["ohlcv"],
         metrics_provider=metrics_view,
+        trades_provider=trades_view,
         risk_provider=risk_view,
         source_health_provider=source_health_view,
         mistakes_provider=mistakes_view,
