@@ -7,6 +7,7 @@ import {
   useHealth,
   useHistory,
   useImprovements,
+  useMetrics,
   useMistakes,
   useOhlcv,
   usePortfolio,
@@ -16,7 +17,7 @@ import {
   useSourceHealth,
   useStrategies,
 } from "@/lib/hooks";
-import { formatMoney, formatPct, formatTime, signClass } from "@/lib/format";
+import { formatMoney, formatNum, formatPct, formatTime, signClass } from "@/lib/format";
 import { StatePanel } from "./StatePanel";
 import { KillSwitch } from "./KillSwitch";
 import { EquityChart } from "./EquityChart";
@@ -34,6 +35,7 @@ export function LiveDashboard() {
   const portfolio = usePortfolio();
   const history = useHistory();
   const ohlcv = useOhlcv();
+  const metrics = useMetrics();
   const positions = usePositions();
   const decisions = useDecisions();
   const sources = useSourceHealth();
@@ -57,6 +59,7 @@ export function LiveDashboard() {
     trend_weight: string;
     meanrev_weight: string;
   } | null;
+  const m = metrics.data ?? {};
 
   const active = strategies.data?.filter((x) => x.gate_status === "active").length ?? 0;
   const observe = strategies.data?.filter((x) => x.gate_status === "observe").length ?? 0;
@@ -113,6 +116,24 @@ export function LiveDashboard() {
           emptyMessage="Waiting for the first tick…"
         >
           <EquityChart points={history.data ?? []} />
+        </StatePanel>
+      </section>
+
+      <section className={styles.panel} aria-label="Performance metrics">
+        <h2 className={styles.panelTitle}>Performance</h2>
+        <StatePanel state={metrics.state} error="Metrics unavailable." emptyMessage="No closed trades yet.">
+          <div className={styles.metricGrid}>
+            <Stat label="Sharpe" value={formatNum(m.sharpe ?? "0", 2)} />
+            <Stat label="Sortino" value={formatNum(m.sortino ?? "0", 2)} />
+            <Stat label="Win rate" value={formatPct(m.win_rate ?? "0")} />
+            <Stat label="Profit factor" value={formatNum(m.profit_factor ?? "0", 2)} />
+            <Stat label="Expectancy" value={formatMoney(m.expectancy ?? "0")} sign={m.expectancy} />
+            <Stat label="Total P&L" value={formatMoney(m.total_pnl ?? "0")} sign={m.total_pnl} />
+            <Stat label="Max DD" value={formatPct(m.max_drawdown ?? "0")} />
+            <Stat label="Trades" value={m.n_trades ?? "0"} />
+            <Stat label="Avg win" value={formatMoney(m.avg_win ?? "0")} sign={m.avg_win} />
+            <Stat label="Avg loss" value={formatMoney(m.avg_loss ?? "0")} sign={m.avg_loss} />
+          </div>
         </StatePanel>
       </section>
 

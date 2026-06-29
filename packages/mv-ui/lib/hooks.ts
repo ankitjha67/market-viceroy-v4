@@ -54,6 +54,9 @@ export const useHistory = (): Polled<HistoryPoint[]> =>
 export const useOhlcv = (): Polled<OhlcvData> =>
   usePolled<OhlcvData>(ENDPOINTS.ohlcv, (d) => d.bars.length === 0);
 
+export const useMetrics = (): Polled<Record<string, string>> =>
+  usePolled<Record<string, string>>(ENDPOINTS.metrics, (d) => Object.keys(d).length === 0);
+
 export const usePositions = (): Polled<Position[]> =>
   usePolled<Position[]>(ENDPOINTS.positions, (d) => d.length === 0);
 

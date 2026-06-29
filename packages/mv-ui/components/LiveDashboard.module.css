@@ -183,6 +183,15 @@
   margin: 0;
 }
 
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  gap: var(--space-4) var(--space-6);
+}
+.metricGrid .statValue {
+  font-size: 19px;
+}
+
 .chips {
   list-style: none;
   margin: 0;

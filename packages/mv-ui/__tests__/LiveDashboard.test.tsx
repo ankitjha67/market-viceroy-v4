@@ -7,6 +7,7 @@ vi.mock("@/lib/hooks", () => ({
   usePortfolio: vi.fn(),
   useHistory: vi.fn(),
   useOhlcv: vi.fn(),
+  useMetrics: vi.fn(),
   usePositions: vi.fn(),
   useDecisions: vi.fn(),
   useSourceHealth: vi.fn(),
@@ -65,6 +66,21 @@ function setup(over: Partial<Record<string, Polled<unknown>>> = {}) {
           { time: 1704070800, open: 100.5, high: 102, low: 100, close: 101.5, volume: 12 },
         ],
         markers: [{ time: 1704070800, side: "BUY", price: "101.5" }],
+      })) as any,
+  );
+  vi.mocked(hooks.useMetrics).mockReturnValue(
+    (over.useMetrics ??
+      polled("loaded", {
+        n_trades: "4",
+        win_rate: "0.5",
+        profit_factor: "1.8",
+        expectancy: "3.2",
+        total_pnl: "12.8",
+        sharpe: "0.42",
+        sortino: "0.61",
+        max_drawdown: "0.012",
+        avg_win: "8.1",
+        avg_loss: "-4.3",
       })) as any,
   );
   vi.mocked(hooks.usePositions).mockReturnValue(
@@ -149,6 +165,8 @@ describe("LiveDashboard", () => {
     expect(screen.getByText("BUY")).toBeInTheDocument();
     expect(screen.getByText("ccxt:binance")).toBeInTheDocument();
     expect(screen.getByText("ema_cross_12_26")).toBeInTheDocument();
+    expect(screen.getByText("Sharpe")).toBeInTheDocument(); // performance panel
+    expect(screen.getByText("Profit factor")).toBeInTheDocument();
   });
 
   it("shows the empty positions message", () => {
