@@ -81,6 +81,9 @@ class ApiState:
     news_provider: Callable[[], dict[str, Any]] = field(
         default=lambda: {"sentiment": {}, "headlines": []}
     )
+    # Strategy Inventor (Phase 13): the latest graded candidates + Operator adopt.
+    candidates_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
+    adopt_candidate_handler: Callable[[str], dict[str, Any]] | None = None
     # Phase 9 screens: risk limits + exposures, journal search, read-only config.
     risk_provider: Callable[[], dict[str, Any]] = field(default=dict)
     settings_provider: Callable[[], dict[str, Any]] = field(default=dict)
@@ -230,6 +233,18 @@ def create_app(state: ApiState) -> FastAPI:
     def news() -> dict[str, Any]:
         """News & sentiment: recent crypto headlines + per-instrument sentiment (Phase 11)."""
         return state.news_provider()
+
+    @app.get("/api/v1/candidates")
+    def candidates() -> list[dict[str, Any]]:
+        """Strategy Inventor: the latest graded candidates + evidence (Phase 13)."""
+        return state.candidates_provider()
+
+    @app.post("/api/v1/candidates/{name:path}/adopt")
+    def adopt_candidate(name: str, _: None = operator) -> dict[str, Any]:
+        """Adopt a gate-cleared candidate into the paper roster (Operator-authed)."""
+        if state.adopt_candidate_handler is None:
+            raise HTTPException(status_code=503, detail="adoption unavailable")
+        return state.adopt_candidate_handler(name)
 
     @app.get("/api/v1/health/sources")
     def source_health() -> list[dict[str, Any]]:

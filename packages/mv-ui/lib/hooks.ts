@@ -6,6 +6,7 @@ import type {
   AgentPipeline,
   AgentRecord,
   ArbOpportunity,
+  CandidateRow,
   CategoryStat,
   DecisionRow,
   Health,
@@ -64,6 +65,9 @@ export const useTrades = (): Polled<TradeRow[]> =>
 
 export const useNews = (): Polled<NewsData> =>
   usePolled<NewsData>(ENDPOINTS.news, (d) => d.headlines.length === 0);
+
+export const useCandidates = (): Polled<CandidateRow[]> =>
+  usePolled<CandidateRow[]>(ENDPOINTS.candidates, (d) => d.length === 0);
 
 export const usePositions = (): Polled<Position[]> =>
   usePolled<Position[]>(ENDPOINTS.positions, (d) => d.length === 0);

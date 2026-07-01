@@ -211,12 +211,14 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
 
     import polars as pl
     import uvicorn
+    from alphakit.bench.inventor import CandidateQueue, build_strategy
     from mv.api.app import ApiState, create_app
     from mv.api.bars import merge_bars
     from mv.api.blotter import trade_rows
     from mv.api.chart import chart_payload
     from mv.api.fx import scale_prices, usd_inr_rate
     from mv.api.instruments import crypto_instrument
+    from mv.api.inventor_view import inventor_rows, run_crypto_inventor
     from mv.api.learning import mistakes_from_fills
     from mv.api.metrics import performance_metrics
     from mv.api.news_feed import fetch_feeds, news_payload
@@ -254,6 +256,11 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         help="disable regime-adaptive weighting (use a plain equal-weight ensemble)",
     )
     parser.add_argument("--agents", action="store_true", help="use the LangGraph agent pipeline")
+    parser.add_argument(
+        "--no-invent",
+        action="store_true",
+        help="disable the background strategy inventor (validation-gated candidate search)",
+    )
     parser.add_argument(
         "--watch", action="store_true", help="re-run continuously as new bars close"
     )
@@ -328,6 +335,48 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             news_state.update(news_payload(fetch_feeds(), symbols))
         except Exception as exc:  # news must never break serving
             print(f"[serve] news refresh skipped: {type(exc).__name__}: {exc}")
+
+    # Strategy Inventor (Phase 13): a background search that grades candidate
+    # strategies through the validation gate over the accumulated INR history and
+    # proposes the survivors for one-click adoption into the paper roster.
+    inventor_state: dict[str, Any] = {"rows": [], "queue": CandidateQueue()}
+
+    def refresh_inventor() -> None:
+        frame = working_frames.get(chart_symbol)
+        if frame is None or frame.height < 150:  # need enough bars for a walk-forward
+            return
+        try:
+            prices = scale_prices(frame, fx_rate).select(["ts", "close"]).to_pandas()
+            prices = prices.set_index("ts")
+            prices.columns = [chart_symbol]
+            results, queue = run_crypto_inventor(prices, data_source="real:accumulated", limit=12)
+            inventor_state["rows"] = inventor_rows(results)
+            inventor_state["queue"] = queue
+            n_surv = sum(1 for r in inventor_state["rows"] if r["adoptable"])
+            print(
+                f"[serve] inventor: {len(inventor_state['rows'])} candidates tested, "
+                f"{n_surv} survived the gate"
+            )
+        except Exception as exc:  # the inventor must never break serving
+            print(f"[serve] inventor run skipped: {type(exc).__name__}: {exc}")
+
+    def adopt_view(name: str) -> dict[str, Any]:
+        # Operator adoption: move a gate-cleared candidate into the live paper roster.
+        candidate = inventor_state["queue"].adopt(name)
+        if candidate is None:
+            return {"adopted": False, "reason": "not a pending candidate"}
+        try:
+            strategy = build_strategy(candidate)
+        except Exception as exc:
+            return {"adopted": False, "reason": f"{type(exc).__name__}: {exc}"}
+        strategy.name = candidate.name  # unique per parameterization (no ensemble collision)
+        strategies.append(strategy)
+        categories[candidate.name] = candidate.family if candidate.family == "meanrev" else "trend"
+        view["settings"] = {
+            **view["settings"],
+            "live_strategies": ", ".join(roster_names(strategies)),
+        }
+        return {"adopted": True, "strategy": candidate.name, "roster_size": len(strategies)}
 
     limits = risk.limits
     live_strategies = ", ".join(roster_names(strategies))
@@ -425,6 +474,8 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         source_health_provider=source_health_view,
         mistakes_provider=mistakes_view,
         settings_provider=lambda: view["settings"],
+        candidates_provider=lambda: inventor_state["rows"],
+        adopt_candidate_handler=adopt_view,
     )
 
     def run_tick() -> None:
@@ -522,6 +573,18 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
 
     run_tick()  # populate before serving
     refresh_news()  # initial news pull
+
+    if not ns.no_invent:
+
+        def inventor_loop() -> None:
+            time.sleep(3)  # let the first window settle before the (heavy) gate run
+            while True:
+                if not kill.is_tripped():
+                    refresh_inventor()
+                time.sleep(1800)  # re-invent every ~30 min (each candidate is a full gate run)
+
+        threading.Thread(target=inventor_loop, daemon=True).start()
+        print("[serve] strategy inventor on: background candidate search (--no-invent to disable)")
 
     if ns.watch:
 
