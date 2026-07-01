@@ -44,12 +44,21 @@ surface.
   synthetic data everything grades OBSERVE (the "validated, not proven" rail flows
   straight through — the loop yields zero survivors, proven end-to-end without a
   fake gate).
-- **13.3 — LLM proposer.** An agent proposes new rule specs (offline-gated via the
-  Phase-4 LLM seam, deterministic fallback), emitted as `Candidate`s into the same
-  loop — the gate remains the safety net for hallucinated / overfit rules.
-- **13.4 — Persistence + runner.** A Postgres candidate store + `scripts/
-  run_inventor.py` (generate -> grade -> propose), mirroring the offline gate
-  runner; the improvement-ledger pattern for the queue.
+- **13.3 — LLM proposer (SHIPPED).** `inventor/llm.py`: `llm_propose` takes an
+  injected `propose_fn` (prompt -> text; the real one wraps the Phase-4 router,
+  offline-gated) and `parse_candidates` validates the JSON against the allowed
+  templates + *in-range* params — an LLM may only pick a known template with params
+  inside the grid's range (it cannot invent leverage/martingale), and any missing
+  router / unparseable response falls back to a deterministic grid slice, so CI +
+  offline stay reproducible. The gate is the safety net for whatever parses.
+- **13.4 — Combined search + offline runner (SHIPPED).** `inventor/search.py`
+  `full_search` combines all three methods deduped by spec (genetic uses
+  *interpolating* mutation to reach novel in-range values a grid never enumerates,
+  so it adds candidates beyond the exhaustive search). `scripts/run_inventor.py`:
+  fetch bars via the governor -> `full_search` -> grade through the gate -> print +
+  write a JSON report. The live `mv-serve` inventor now uses `full_search` too. A
+  durable Postgres candidate store remains a follow-on (the zero-Docker Operator
+  box persists via the JSON report / the served run).
 - **13.5 — API + UI (SHIPPED).** `GET /api/v1/candidates` (the latest graded run +
   evidence) + `POST /api/v1/candidates/{name}/adopt` (Operator-authed). `mv-serve`
   runs a **background inventor** (`--no-invent` to disable): every ~30 min it

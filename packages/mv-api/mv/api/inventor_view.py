@@ -19,7 +19,7 @@ from alphakit.bench.inventor import (
     CandidateQueue,
     InventionResult,
     candidate_evaluator,
-    parameter_search,
+    full_search,
     run_inventor,
     valid_combo,
 )
@@ -56,7 +56,7 @@ def run_crypto_inventor(
     ``limit`` caps the search (each candidate is a full gate run). The queue holds
     only the gate-cleared survivors, awaiting the Operator's one-click adoption.
     """
-    candidates = parameter_search(list(DEFAULT_GRIDS), valid=valid_combo)[:limit]
+    candidates = full_search(list(DEFAULT_GRIDS), valid=valid_combo)[:limit]
     gate = ValidationGate(n_trials=max(len(candidates), 1), trials_sharpe_std=1.0)
     evaluate = candidate_evaluator(prices, data_source=data_source, gate=gate)
     results = run_inventor(candidates, evaluate)

@@ -32,7 +32,9 @@ from alphakit.bench.inventor.inventor import (
     run_inventor,
     survivors,
 )
+from alphakit.bench.inventor.llm import ProposeFn, build_prompt, llm_propose, parse_candidates
 from alphakit.bench.inventor.queue import CandidateQueue, QueuedCandidate
+from alphakit.bench.inventor.search import full_search
 
 __all__ = [
     "DEFAULT_GRIDS",
@@ -42,14 +44,19 @@ __all__ = [
     "Evaluator",
     "InventionResult",
     "ParamGrid",
+    "ProposeFn",
     "QueuedCandidate",
+    "build_prompt",
     "build_strategy",
     "candidate_evaluator",
     "crossover",
     "evolve",
+    "full_search",
+    "llm_propose",
     "make_candidate",
     "mutate",
     "parameter_search",
+    "parse_candidates",
     "run_inventor",
     "survivors",
     "valid_combo",
