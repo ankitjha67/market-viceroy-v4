@@ -34,10 +34,16 @@ surface.
   generators, the `run_inventor` loop (grades candidates through an injected
   evaluator, ranks survivors), and the propose-only `CandidateQueue`. Pure +
   tested against a fake gate.
-- **13.2 — Real evaluator.** Wrap a fresh backtest (vectorbt bridge) + the gate
-  stages around a `Candidate` -> `GateResult`, so `run_inventor` grades real
-  parameterizations. Reuses `deflated_sharpe` / `monte_carlo` / `walk_forward` /
-  `regime` / `decide`.
+- **13.2 — Real evaluator (SHIPPED).** `inventor/evaluator.py`: a `Candidate` ->
+  live `StrategyProtocol` factory registry (ema/sma/donchian crosses,
+  rsi/bollinger/zscore — the parameterizable crypto families) + `candidate_evaluator`,
+  which grades a candidate through the existing `ValidationGate.evaluate` (fresh
+  cost-aware backtest → walk-forward → regime → deflated Sharpe → Monte-Carlo →
+  decide) over an injected price frame. `DEFAULT_GRIDS` + `valid_combo` define the
+  search space. A broken candidate grades FAILED, never crashing the run; on
+  synthetic data everything grades OBSERVE (the "validated, not proven" rail flows
+  straight through — the loop yields zero survivors, proven end-to-end without a
+  fake gate).
 - **13.3 — LLM proposer.** An agent proposes new rule specs (offline-gated via the
   Phase-4 LLM seam, deterministic fallback), emitted as `Candidate`s into the same
   loop — the gate remains the safety net for hallucinated / overfit rules.
