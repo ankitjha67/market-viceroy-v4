@@ -1,12 +1,13 @@
 """Candidate generators — parameter search and genetic combination.
 
-Two of the three invention methods (the LLM proposer is a follow-on): a
+Two of the three invention methods (the LLM proposer is in ``llm.py``): a
 deterministic **grid search** over a template's parameter space, and **genetic**
 mutation / crossover to explore beyond the grid from a set of parents (typically
-the prior generation's survivors). All generation is bounded to composable
-building blocks — it can never invent leverage / martingale mechanics; the
-validation gate is the honest filter downstream. Pure and deterministic (genetic
-ops take an injected RNG so runs reproduce).
+the prior generation's survivors; interpolating mutation reaches values between
+grid points). All generation is bounded to composable building blocks — it can
+never invent leverage / martingale mechanics; the validation gate is the honest
+filter downstream. Pure and deterministic (genetic ops take an injected RNG so
+runs reproduce).
 """
 
 from __future__ import annotations
@@ -56,16 +57,34 @@ def parameter_search(
     return out
 
 
-def mutate(candidate: Candidate, grid: ParamGrid, rng: Random) -> Candidate:
-    """Change one parameter of ``candidate`` to a different value from ``grid``."""
+def mutate(
+    candidate: Candidate, grid: ParamGrid, rng: Random, *, interpolate: bool = False
+) -> Candidate:
+    """Change one parameter of ``candidate``.
+
+    Default: jump to another grid value. With ``interpolate`` (numeric params), move
+    to the midpoint between the current value and a neighbor — a novel **in-range**
+    value the grid never enumerates, so genetic search adds candidates beyond an
+    exhaustive grid instead of only re-deriving grid points.
+    """
     params = candidate.param_dict
     tunable = [key for key in params if key in grid.grid and len(grid.grid[key]) > 1]
     if not tunable:
         return candidate
     key = rng.choice(tunable)
-    choices = [value for value in grid.grid[key] if value != params[key]]
-    if choices:
-        params[key] = rng.choice(choices)
+    values = grid.grid[key]
+    current = params[key]
+    if interpolate and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
+        others = [v for v in values if v != current]
+        neighbor = rng.choice(others) if others else current
+        midpoint = (current + neighbor) / 2
+        params[key] = (
+            round(midpoint) if isinstance(current, int) and isinstance(neighbor, int) else midpoint
+        )
+    else:
+        choices = [value for value in values if value != current]
+        if choices:
+            params[key] = rng.choice(choices)
     return make_candidate(candidate.strategy, params, family=candidate.family, provenance="genetic")
 
 
@@ -88,18 +107,20 @@ def evolve(
     *,
     rng: Random,
     limit: int = 8,
+    interpolate: bool = False,
 ) -> list[Candidate]:
     """The next generation from ``parents``: mutations + same-template crossovers.
 
     Offspring already present in ``parents`` are dropped; the result is deduped and
-    capped at ``limit``. Deterministic given ``rng``.
+    capped at ``limit``. ``interpolate`` lets mutation explore between grid points
+    (novel in-range values). Deterministic given ``rng``.
     """
     by_strategy = {grid.strategy: grid for grid in grids}
     offspring: list[Candidate] = []
     for parent in parents:
         grid = by_strategy.get(parent.strategy)
         if grid is not None:
-            offspring.append(mutate(parent, grid, rng))
+            offspring.append(mutate(parent, grid, rng, interpolate=interpolate))
     for a, b in itertools.combinations(parents, 2):
         if a.strategy == b.strategy:
             offspring.append(crossover(a, b))
