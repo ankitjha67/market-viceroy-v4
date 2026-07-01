@@ -8,6 +8,7 @@ const LINKS: ReadonlyArray<{ href: string; label: string }> = [
   { href: "/", label: "Live Dashboard" },
   { href: "/agents", label: "Agent Room" },
   { href: "/strategies", label: "Strategy Lab" },
+  { href: "/inventor", label: "Strategy Inventor" },
   { href: "/postmortem", label: "Post-Mortem Room" },
   { href: "/arbitrage", label: "Arbitrage Monitor" },
   { href: "/risk", label: "Risk Console" },

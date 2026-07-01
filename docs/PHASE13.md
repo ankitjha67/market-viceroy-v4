@@ -50,10 +50,15 @@ surface.
 - **13.4 — Persistence + runner.** A Postgres candidate store + `scripts/
   run_inventor.py` (generate -> grade -> propose), mirroring the offline gate
   runner; the improvement-ledger pattern for the queue.
-- **13.5 — API + UI.** `GET /candidates` (pending survivors + evidence) +
-  `POST /candidates/{name}/adopt` (Operator-authed) + a **Strategy Inventor**
-  screen: the candidate queue, each with its walk-forward / deflated-Sharpe / MC /
-  regime evidence and an Adopt button. The paper roster reads adopted candidates.
+- **13.5 — API + UI (SHIPPED).** `GET /api/v1/candidates` (the latest graded run +
+  evidence) + `POST /api/v1/candidates/{name}/adopt` (Operator-authed). `mv-serve`
+  runs a **background inventor** (`--no-invent` to disable): every ~30 min it
+  searches the crypto families and grades them through the gate over the
+  accumulated INR history, storing the run + the survivor queue. Adoption builds
+  the candidate's strategy (uniquely named per parameterization) and appends it to
+  the live paper roster. `mv-ui` **Strategy Inventor** screen: the graded
+  candidates with their deflated-Sharpe / OOS-Sharpe / walk-forward evidence, the
+  tested/survived summary, and an Operator-token Adopt button on the survivors.
 
 ## The honest constraint (crypto history depth)
 The free CCXT feed caps ~500 bars with no date-range — not enough for a robust

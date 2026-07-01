@@ -44,6 +44,25 @@ export function resetKillSwitch(token: string, operatorId: string): Promise<void
   return postOperator(`/api/v1/risk/reset?operator_id=${encodeURIComponent(operatorId)}`, token);
 }
 
+async function postOperatorJson<T>(path: string, token: string): Promise<T> {
+  const resp = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "X-Operator-Token": token },
+  });
+  if (!resp.ok) {
+    throw new ApiError(resp.status, `${path} -> ${resp.status}`);
+  }
+  return (await resp.json()) as T;
+}
+
+/** Adopt a gate-cleared inventor candidate into the paper roster (Operator-authed). */
+export function adoptCandidate(
+  name: string,
+  token: string,
+): Promise<{ adopted: boolean; reason?: string; strategy?: string }> {
+  return postOperatorJson(`/api/v1/candidates/${encodeURIComponent(name)}/adopt`, token);
+}
+
 export const ENDPOINTS = {
   health: "/api/v1/health",
   portfolio: "/api/v1/portfolio",
@@ -52,6 +71,7 @@ export const ENDPOINTS = {
   metrics: "/api/v1/metrics",
   trades: "/api/v1/trades",
   news: "/api/v1/news",
+  candidates: "/api/v1/candidates",
   positions: "/api/v1/positions",
   decisions: "/api/v1/decisions",
   sourceHealth: "/api/v1/health/sources",

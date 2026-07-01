@@ -67,6 +67,18 @@ export interface NewsData {
   headlines: NewsHeadline[];
 }
 
+/** One graded strategy candidate from the inventor (with its gate evidence). */
+export interface CandidateRow {
+  name: string;
+  strategy: string;
+  family: string;
+  provenance: string;
+  status: "active" | "observe" | "failed";
+  adoptable: boolean;
+  reasons: string[];
+  metrics: Record<string, number>;
+}
+
 /** One closed round trip on the trade blotter (money as strings). */
 export interface TradeRow {
   id: string;
