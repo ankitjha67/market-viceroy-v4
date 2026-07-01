@@ -12,6 +12,13 @@ This package is the pure orchestration + generation core; the real evaluator
 from __future__ import annotations
 
 from alphakit.bench.inventor.candidate import Candidate, make_candidate
+from alphakit.bench.inventor.evaluator import (
+    DEFAULT_GRIDS,
+    STRATEGY_FACTORIES,
+    build_strategy,
+    candidate_evaluator,
+    valid_combo,
+)
 from alphakit.bench.inventor.generate import (
     ParamGrid,
     crossover,
@@ -28,12 +35,16 @@ from alphakit.bench.inventor.inventor import (
 from alphakit.bench.inventor.queue import CandidateQueue, QueuedCandidate
 
 __all__ = [
+    "DEFAULT_GRIDS",
+    "STRATEGY_FACTORIES",
     "Candidate",
     "CandidateQueue",
     "Evaluator",
     "InventionResult",
     "ParamGrid",
     "QueuedCandidate",
+    "build_strategy",
+    "candidate_evaluator",
     "crossover",
     "evolve",
     "make_candidate",
@@ -41,4 +52,5 @@ __all__ = [
     "parameter_search",
     "run_inventor",
     "survivors",
+    "valid_combo",
 ]
