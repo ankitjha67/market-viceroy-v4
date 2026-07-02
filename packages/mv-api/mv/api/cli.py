@@ -279,6 +279,13 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         raise SystemExit(
             "mv-serve: set MV_OPERATOR_TOKEN — the Operator secret guarding kill/reset/graduate"
         )
+    if ns.host not in ("127.0.0.1", "localhost", "::1"):
+        # Mutations are token-guarded, but READS (positions/equity/journal) are
+        # deliberately unauthenticated for the local deck — never expose them.
+        print(
+            f"[serve][WARNING] binding {ns.host}: read endpoints expose the trading "
+            "posture without auth. Keep 127.0.0.1 unless the network path is secured."
+        )
 
     settings = Settings()
     registry = build_default_registry()

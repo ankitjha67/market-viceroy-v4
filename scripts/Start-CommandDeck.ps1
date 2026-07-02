@@ -29,7 +29,10 @@ param(
     [string]$RepoRoot = 'E:\Python\Market Viceroy v4',
     [int]$ApiPort = 8000,
     [int]$UiPort = 3000,
-    [string]$OperatorToken = 'paper-secret',
+    # Empty -> reuse the token in .env, else generate a random one (never a
+    # static default: this file is public, so a hardcoded token would hand
+    # kill/reset/adopt/graduate rights to anyone who can reach the API).
+    [string]$OperatorToken = '',
     [string]$Timeframe = '1m',
     [int]$IntervalSeconds = 60,
     [switch]$Agents
@@ -38,6 +41,43 @@ param(
 $ErrorActionPreference = 'Stop'
 
 function Write-Step([string]$Message) { Write-Host "==> $Message" -ForegroundColor Cyan }
+
+# Cryptographically random 32-byte hex token (same scheme as Start-MarketViceroy).
+function New-OperatorToken {
+    $bytes = New-Object 'System.Byte[]' 32
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+    return (([System.BitConverter]::ToString($bytes)) -replace '-', '').ToLower()
+}
+
+# Read a KEY=value from the git-ignored .env (returns $null when absent).
+function Get-DotEnvValue([string]$Name) {
+    $envFile = Join-Path $RepoRoot '.env'
+    if (-not (Test-Path -LiteralPath $envFile)) { return $null }
+    foreach ($line in Get-Content -LiteralPath $envFile) {
+        if ($line -match ("^\s*" + [regex]::Escape($Name) + "\s*=\s*(.*)$")) {
+            $value = $Matches[1].Trim().Trim('"').Trim("'")
+            if ($value) { return $value }
+        }
+    }
+    return $null
+}
+
+# Update-or-append KEY=value in the git-ignored .env.
+function Set-DotEnvValue([string]$Name, [string]$Value) {
+    $envFile = Join-Path $RepoRoot '.env'
+    $line = "$Name=$Value"
+    if (Test-Path -LiteralPath $envFile) {
+        $content = Get-Content -LiteralPath $envFile
+        $pattern = "^\s*" + [regex]::Escape($Name) + "\s*="
+        if ($content -match $pattern) {
+            $content = $content | ForEach-Object { if ($_ -match $pattern) { $line } else { $_ } }
+        }
+        else { $content = @($content) + $line }
+        Set-Content -LiteralPath $envFile -Value $content -Encoding ascii
+    }
+    else { Set-Content -LiteralPath $envFile -Value @($line) -Encoding ascii }
+}
 
 # Kill whatever is listening on a port (clears stray mv-serve / next dev servers).
 function Reset-Port([int]$Port) {
@@ -112,6 +152,16 @@ Reset-Port 3002
 Start-Sleep -Seconds 1
 
 # --- 4. start the API window ----------------------------------------------
+# Resolve the Operator token: explicit param > .env > freshly generated. The
+# generated token is persisted to the git-ignored .env so the Kill / Adopt
+# buttons keep working across restarts (open .env to copy the value).
+$weakTokens = @('', 'paper-secret', 'change-me-operator-token')
+if ($OperatorToken -in $weakTokens) { $OperatorToken = Get-DotEnvValue 'MV_OPERATOR_TOKEN' }
+if (-not $OperatorToken -or ($OperatorToken -in $weakTokens)) {
+    $OperatorToken = New-OperatorToken
+    Set-DotEnvValue 'MV_OPERATOR_TOKEN' $OperatorToken
+    Write-Host 'Generated a random MV_OPERATOR_TOKEN and stored it in .env (guards Kill / Adopt / graduate; open .env to copy it).' -ForegroundColor Green
+}
 $agentFlag = if ($Agents) { ' --agents' } else { '' }
 $mode = if ($Agents) { 'AI agents' } else { 'ensemble' }
 Write-Step "Starting API (mv-serve, $mode, continuous: re-runs every ${IntervalSeconds}s on $Timeframe bars) on :$ApiPort"
