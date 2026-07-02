@@ -93,12 +93,27 @@ def score_news(items: list[NewsItem], *, instrument: str) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=list(FEATURE_COLUMNS))
 
 
+# Refuse to buffer a feed beyond this (a compromised/misbehaving feed must not
+# be able to exhaust memory — the body is read streamed, capped, then decoded).
+_MAX_FEED_BYTES = 2 * 1024 * 1024
+
+
 def fetch_rss(
-    url: str, *, user_agent: str = "MarketViceroy/0.1"
+    url: str, *, user_agent: str = "MarketViceroy/0.1", max_bytes: int = _MAX_FEED_BYTES
 ) -> str:  # pragma: no cover - network
-    """Fetch raw RSS XML from ``url``."""
+    """Fetch raw RSS XML from ``url`` (streamed; aborts past ``max_bytes``)."""
     import requests
 
-    response = requests.get(url, headers={"User-Agent": user_agent}, timeout=30)
-    response.raise_for_status()
-    return response.text
+    response = requests.get(url, headers={"User-Agent": user_agent}, timeout=30, stream=True)
+    try:
+        response.raise_for_status()
+        chunks: list[bytes] = []
+        total = 0
+        for chunk in response.iter_content(chunk_size=65536):
+            total += len(chunk)
+            if total > max_bytes:
+                raise ValueError(f"feed exceeds {max_bytes} bytes: {url}")
+            chunks.append(chunk)
+    finally:
+        response.close()
+    return b"".join(chunks).decode(response.encoding or "utf-8", errors="replace")

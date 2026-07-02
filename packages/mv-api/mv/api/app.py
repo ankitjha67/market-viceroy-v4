@@ -140,12 +140,15 @@ def create_app(state: ApiState) -> FastAPI:
         return {"action": event.action, "operator": event.operator}
 
     @app.get("/api/v1/decisions")
-    def decisions() -> list[dict[str, Any]]:
-        return [
+    def decisions(limit: Annotated[int, Query(ge=1, le=2000)] = 500) -> list[dict[str, Any]]:
+        """The most recent ``limit`` decisions (clamped: the multi-instrument journal
+        can hold tens of thousands of entries, and the UI polls this every ~2s)."""
+        rows = [
             {"seq": entry.seq, "ts": entry.ts.isoformat(), "payload": entry.payload}
             for entry in state.journal.entries()
             if entry.kind == "decision"
         ]
+        return rows[-limit:]
 
     # ``:path`` so instrument-bearing snapshot ids (e.g. "BTC/USDT:<ts>") match.
     @app.get("/api/v1/decisions/{snapshot_id:path}/agents")

@@ -48,3 +48,10 @@ def test_caps_headline_count() -> None:
     items = [_item(f"Bitcoin update number {i}", i) for i in range(20)]
     out = news_payload(items, ["BTC/USDT"], max_items=5)
     assert len(out["headlines"]) == 5
+
+
+def test_caps_headline_length() -> None:
+    # External content is bounded before it is served (defense-in-depth).
+    long_title = "Bitcoin " + "x" * 500
+    out = news_payload([_item(long_title)], ["BTC/USDT"])
+    assert len(out["headlines"][0]["title"]) == 300

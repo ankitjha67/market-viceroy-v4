@@ -67,6 +67,20 @@ def test_decisions_and_positions() -> None:
     assert positions[0]["symbol"] == "BTC/USDT"
 
 
+def test_decisions_limit_is_clamped_and_returns_most_recent() -> None:
+    # The multi-instrument journal can hold tens of thousands of decisions; the
+    # endpoint must window the response (most recent) and reject absurd limits.
+    client, _, journal = _client()
+    journal.append("decision", {"action": "SELL", "instrument": "ETH/USDT"})
+    journal.append("decision", {"action": "HOLD", "instrument": "SOL/USDT"})
+
+    last_two = client.get("/api/v1/decisions", params={"limit": 2}).json()
+    assert [d["payload"]["action"] for d in last_two] == ["SELL", "HOLD"]  # most recent
+
+    assert client.get("/api/v1/decisions", params={"limit": 3000}).status_code == 422
+    assert client.get("/api/v1/decisions", params={"limit": 0}).status_code == 422
+
+
 def test_arbitrage_endpoint() -> None:
     state = ApiState(
         kill_switch=KillSwitch(),

@@ -18,6 +18,10 @@ from typing import Any
 from mv.intelligence.news import NewsItem, parse_rss
 from mv.intelligence.sentiment import score_text
 
+# External headline text is bounded before it is served (defense-in-depth: the
+# UI escapes it, but the API should not relay arbitrarily long external content).
+_MAX_TITLE_CHARS = 300
+
 # Free, keyless crypto-news RSS feeds.
 CRYPTO_FEEDS: tuple[str, ...] = (
     "https://www.coindesk.com/arc/outboundfeeds/rss/",
@@ -76,7 +80,7 @@ def news_payload(
             by_symbol[sym].append(score)
         scored.append(
             {
-                "title": item.title,
+                "title": item.title[:_MAX_TITLE_CHARS],
                 "score": round(score, 3),
                 "ts": item.published.isoformat(),
                 "symbols": matched,
