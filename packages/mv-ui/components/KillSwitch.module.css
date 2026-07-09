@@ -17,7 +17,7 @@
   cursor: pointer;
 }
 .button:hover {
-  background: oklch(0.96 0.03 27);
+  background: var(--surface-sunk);
 }
 
 .halted {

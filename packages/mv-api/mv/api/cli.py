@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, TypedDict
 
 from mv.api.state import RedisKillSwitchState
@@ -51,6 +51,22 @@ def _inr_fallback() -> Decimal:  # pragma: no cover - trivial env read
         return Decimal(os.environ.get("MV_USD_INR_FALLBACK", "83"))
     except ArithmeticError:
         return Decimal("83")
+
+
+def resolve_start_equity(cli_value: str | None, env_value: str | None) -> Decimal:
+    """Starting paper capital in INR: ``--capital`` > ``MV_START_EQUITY`` > ₹5000.
+
+    A positive number is required; anything else is a startup error (better a
+    clear exit than silently trading a nonsense book).
+    """
+    raw = (cli_value or env_value or "5000").strip()
+    try:
+        value = Decimal(raw)
+    except (InvalidOperation, ValueError) as exc:
+        raise SystemExit(f"mv: --capital / MV_START_EQUITY must be a number, got {raw!r}") from exc
+    if value <= 0:
+        raise SystemExit(f"mv: starting capital must be positive, got {value}")
+    return value
 
 
 def _kill_switch_for(
@@ -133,6 +149,11 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         action="store_true",
         help="use the LangGraph agent pipeline instead of the deterministic ensemble",
     )
+    parser.add_argument(
+        "--capital",
+        default=None,
+        help="starting paper capital in INR (default MV_START_EQUITY or 5000)",
+    )
     ns = parser.parse_args(sys.argv[1:] if argv is None else argv)
 
     settings = Settings()
@@ -156,7 +177,7 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             f"mv-paper: --strategies matched none; valid: {', '.join(available_names())}"
         )
 
-    start_equity = Decimal("5000")  # INR
+    start_equity = resolve_start_equity(ns.capital, os.environ.get("MV_START_EQUITY"))  # INR
     engine = run_paper_session(
         frame=frame_inr,
         symbol=ns.symbol,
@@ -231,6 +252,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         roster_names,
     )
     from mv.api.snapshot import portfolio_from_fills, positions_from_fills
+    from mv.api.telemetry import SourceTelemetry
     from mv.postmortem.trades import fill_from_journal, reconstruct_closed_trades
     from mv.risk.engine import RiskEngine
 
@@ -269,6 +291,11 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     )
     parser.add_argument(
         "--max-bars", type=int, default=2000, help="cap on the growing window / history (--watch)"
+    )
+    parser.add_argument(
+        "--capital",
+        default=None,
+        help="starting paper capital in INR, split across the watchlist (default MV_START_EQUITY or 5000)",
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
@@ -318,7 +345,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     chart_symbol = ns.symbol if ns.symbol in symbols else symbols[0]
     categories = categories_for(strategies)
     regime_adaptive = not ns.static_weights
-    start_equity = Decimal("5000")  # INR — the whole book
+    start_equity = resolve_start_equity(ns.capital, os.environ.get("MV_START_EQUITY"))  # INR book
     per_symbol_equity = start_equity / len(symbols)  # the sizing slice per instrument
     mode = "agents" if ns.agents else "ensemble"
     fx_rate = usd_inr_rate(
@@ -332,6 +359,10 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     working_frames: dict[str, pl.DataFrame] = {}
     peak_equity = start_equity
     news_state: dict[str, Any] = {"sentiment": {}, "headlines": []}
+    # Real source telemetry: the loop times every fetch into this, and the health
+    # panel reports measured latency + request-rate quota (not placeholder zeros).
+    telemetry = SourceTelemetry()
+    health_meta: dict[str, Any] = {"last_failover": None, "prev_source": ""}
 
     def refresh_news() -> None:
         # Live crypto news -> per-instrument sentiment. Network + slow-moving, so
@@ -402,6 +433,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             "n_instruments": len(symbols),
             "timeframe": ns.timeframe,
             "currency": "INR",
+            "start_equity": str(start_equity),
             "fx_usd_inr": str(fx_rate),
             "weighting": "regime-adaptive" if regime_adaptive else "equal-weight",
             "regime": None,
@@ -427,15 +459,16 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         src = str(view["settings"].get("source") or "")
         if not src:
             return []
+        stats = telemetry.view(src, at=time.monotonic())
         return [
             {
                 "source": src,
                 "domain": "crypto.prices",
-                "status": "green",
-                "quota_burn_pct": 0,
-                "latency_p50_ms": 0,
-                "latency_p95_ms": 0,
-                "last_failover": None,
+                "status": stats["status"],
+                "quota_burn_pct": stats["quota_burn_pct"],
+                "latency_p50_ms": stats["latency_p50_ms"],
+                "latency_p95_ms": stats["latency_p95_ms"],
+                "last_failover": health_meta["last_failover"],
                 "reconcile_flag": False,
             }
         ]
@@ -495,7 +528,9 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         source = ""
         for sym in symbols:
             try:
+                started = time.monotonic()
                 fresh = router.get_bars(CRYPTO_PRICES, sym, ns.timeframe, limit=ns.limit)
+                telemetry.record(fresh.source, (time.monotonic() - started) * 1000.0, at=started)
                 source = fresh.source
                 working_frames[sym] = (
                     fresh.frame
@@ -523,6 +558,12 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             except Exception as exc:  # one bad/illiquid symbol must not break the tick
                 print(f"[serve] {sym} skipped this tick: {type(exc).__name__}: {exc}")
                 continue
+
+        # A change of serving source since last tick is a real failover — stamp it.
+        if source and source != health_meta["prev_source"]:
+            if health_meta["prev_source"]:
+                health_meta["last_failover"] = datetime.now(timezone.utc).isoformat()
+            health_meta["prev_source"] = source
 
         entries = list(journal.entries())
         fills = [fill_from_journal(e.payload, ts=e.ts) for e in entries if e.kind == "execution"]

@@ -31,7 +31,7 @@
 .error {
   border: 1px solid var(--status-red);
   border-left-width: 3px;
-  background: oklch(0.96 0.03 27);
+  background: color-mix(in oklch, var(--neg) 14%, var(--surface));
   color: var(--ink);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius);

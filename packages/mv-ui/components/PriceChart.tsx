@@ -17,8 +17,8 @@ import type { OhlcvData } from "@/lib/types";
 import { ema } from "@/lib/indicators";
 import styles from "./PriceChart.module.css";
 
-const UP = "#2f7a4d";
-const DOWN = "#b23a2e";
+const UP = "#2ea043";
+const DOWN = "#e5534b";
 
 /**
  * The live price candles with the strategies' EMAs, a volume pane, and BUY/SELL
@@ -42,10 +42,10 @@ export function PriceChart({ data }: { data: OhlcvData }) {
       height: 320,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#5a564e",
+        textColor: "#8b949e",
         attributionLogo: false,
       },
-      grid: { horzLines: { color: "#e7e2d8" }, vertLines: { color: "#f0ece3" } },
+      grid: { horzLines: { color: "#1c2230" }, vertLines: { color: "#161b24" } },
       rightPriceScale: { borderVisible: false },
       timeScale: {
         borderVisible: false,
@@ -83,17 +83,17 @@ export function PriceChart({ data }: { data: OhlcvData }) {
     const volume = chart.addHistogramSeries({
       priceScaleId: "volume",
       priceFormat: { type: "volume" },
-      color: "#cbb89a",
+      color: "#3a4453",
     });
     chart.priceScale("volume").applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
     const fast = chart.addLineSeries({
-      color: "#c9742e",
+      color: "#d9a441",
       lineWidth: 1,
       priceLineVisible: false,
       lastValueVisible: false,
     });
     const slow = chart.addLineSeries({
-      color: "#3a6ea5",
+      color: "#6ea8e0",
       lineWidth: 1,
       priceLineVisible: false,
       lastValueVisible: false,
@@ -139,7 +139,7 @@ export function PriceChart({ data }: { data: OhlcvData }) {
         (b): HistogramData => ({
           time: b.time as UTCTimestamp,
           value: b.volume,
-          color: b.close >= b.open ? "rgba(47,122,77,0.45)" : "rgba(178,58,46,0.45)",
+          color: b.close >= b.open ? "rgba(46,160,67,0.42)" : "rgba(229,83,75,0.42)",
         }),
       ),
     );
