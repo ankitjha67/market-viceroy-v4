@@ -35,6 +35,9 @@ param(
     [string]$OperatorToken = '',
     [string]$Timeframe = '1m',
     [int]$IntervalSeconds = 60,
+    # Starting paper capital in INR. Empty -> the mv-serve default (5000 or the
+    # MV_START_EQUITY in .env). Set e.g. -Capital 100000 to trade a larger book.
+    [string]$Capital = '',
     [switch]$Agents
 )
 
@@ -163,6 +166,7 @@ if (-not $OperatorToken -or ($OperatorToken -in $weakTokens)) {
     Write-Host 'Generated a random MV_OPERATOR_TOKEN and stored it in .env (guards Kill / Adopt / graduate; open .env to copy it).' -ForegroundColor Green
 }
 $agentFlag = if ($Agents) { ' --agents' } else { '' }
+$capitalFlag = if ($Capital) { " --capital $Capital" } else { '' }
 $mode = if ($Agents) { 'AI agents' } else { 'ensemble' }
 Write-Step "Starting API (mv-serve, $mode, continuous: re-runs every ${IntervalSeconds}s on $Timeframe bars) on :$ApiPort"
 Start-ServerWindow @"
@@ -171,7 +175,7 @@ Set-Location '$RepoRoot'
 `$env:MV_OPERATOR_TOKEN = '$OperatorToken'
 `$env:MV_UI_ORIGIN = 'http://localhost:$UiPort'
 `$env:UV_LINK_MODE = 'copy'
-uv run mv-serve --host 127.0.0.1 --port $ApiPort --watch --interval $IntervalSeconds --timeframe $Timeframe$agentFlag
+uv run mv-serve --host 127.0.0.1 --port $ApiPort --watch --interval $IntervalSeconds --timeframe $Timeframe$agentFlag$capitalFlag
 "@
 
 # --- 5. wait for the API (it runs a paper session first, then serves) -----

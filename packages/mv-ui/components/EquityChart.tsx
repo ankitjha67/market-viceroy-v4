@@ -45,10 +45,10 @@ export function EquityChart({ points }: { points: HistoryPoint[] }) {
       height: 240,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#5a564e",
+        textColor: "#8b949e",
         attributionLogo: false,
       },
-      grid: { horzLines: { color: "#e7e2d8" }, vertLines: { visible: false } },
+      grid: { horzLines: { color: "#1c2230" }, vertLines: { visible: false } },
       rightPriceScale: { borderVisible: false },
       localization: { timeFormatter: crosshairLabel },
       timeScale: {
@@ -61,9 +61,9 @@ export function EquityChart({ points }: { points: HistoryPoint[] }) {
       handleScroll: false,
     });
     const series = chart.addAreaSeries({
-      lineColor: "#7a2d1f",
-      topColor: "rgba(122, 45, 31, 0.18)",
-      bottomColor: "rgba(122, 45, 31, 0.02)",
+      lineColor: "#d9a441",
+      topColor: "rgba(217, 164, 65, 0.20)",
+      bottomColor: "rgba(217, 164, 65, 0.02)",
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
