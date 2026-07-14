@@ -11,6 +11,9 @@ zero API keys.** Keys are only for breadth (US / India / macro) and the optional
 cloud LLM. You can see the whole system work today without signing up for
 anything.
 
+Architecture source of truth (components, decision hierarchy, implementation
+status, ADRs, roadmap): `docs/ARCHITECTURE.md`.
+
 ---
 
 ## 0. The 60-second path (no keys, no Docker account needed)
