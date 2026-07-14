@@ -7,6 +7,8 @@ only through explicit, Operator-signed gates. Crypto-first → India → US/FX.
 
 The authoritative product spec (PRD, build plan, repo audit) and the engineering
 standards / non-negotiables are kept internal and are not published here.
+The architectural source of truth — components, decision hierarchy, per-component
+implementation status, ADRs, and the forward roadmap — is `docs/ARCHITECTURE.md`.
 
 ## Status — Phases 0–10 complete
 
