@@ -25,6 +25,8 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
+from mv.api.prom import prometheus_text
 from mv.api.strategies import get_strategy, list_strategies
 from mv.api.ws import BroadcastHub
 from mv.journal.journal import Journal
@@ -80,6 +82,10 @@ class ApiState:
     # News & sentiment (Phase 11): live headlines + per-instrument sentiment.
     news_provider: Callable[[], dict[str, Any]] = field(
         default=lambda: {"sentiment": {}, "headlines": []}
+    )
+    # Market intel (Phase 14): Fear & Greed + perp funding + social sentiment.
+    intel_provider: Callable[[], dict[str, Any]] = field(
+        default=lambda: {"fear_greed": None, "funding": {}, "social": {}}
     )
     # Strategy Inventor (Phase 13): the latest graded candidates + Operator adopt.
     candidates_provider: Callable[[], list[dict[str, Any]]] = field(default=lambda: [])
@@ -236,6 +242,26 @@ def create_app(state: ApiState) -> FastAPI:
     def news() -> dict[str, Any]:
         """News & sentiment: recent crypto headlines + per-instrument sentiment (Phase 11)."""
         return state.news_provider()
+
+    @app.get("/api/v1/intel")
+    def intel() -> dict[str, Any]:
+        """Market intel: Fear & Greed + perp funding/OI + social sentiment (Phase 14)."""
+        return state.intel_provider()
+
+    @app.get("/metrics", response_class=PlainTextResponse)
+    def metrics_prometheus() -> str:
+        """The live posture in Prometheus exposition format (Phase 14, zero-dep).
+
+        Standard scrape target for the optional observability overlay; rendered
+        from the same injected providers the deck reads, so the numbers cannot
+        diverge from what the Operator sees.
+        """
+        return prometheus_text(
+            portfolio=state.portfolio_provider(),
+            positions_count=len(state.positions_provider()),
+            kill_tripped=state.kill_switch.is_tripped(),
+            sources=state.source_health_provider(),
+        )
 
     @app.get("/api/v1/candidates")
     def candidates() -> list[dict[str, Any]]:

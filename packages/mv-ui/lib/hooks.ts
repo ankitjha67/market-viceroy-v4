@@ -12,6 +12,7 @@ import type {
   Health,
   HistoryPoint,
   Improvement,
+  IntelData,
   NewsData,
   OhlcvData,
   Portfolio,
@@ -65,6 +66,15 @@ export const useTrades = (): Polled<TradeRow[]> =>
 
 export const useNews = (): Polled<NewsData> =>
   usePolled<NewsData>(ENDPOINTS.news, (d) => d.headlines.length === 0);
+
+export const useIntel = (): Polled<IntelData> =>
+  usePolled<IntelData>(
+    ENDPOINTS.intel,
+    (d) =>
+      d.fear_greed === null &&
+      Object.keys(d.funding).length === 0 &&
+      Object.keys(d.social).length === 0,
+  );
 
 export const useCandidates = (): Polled<CandidateRow[]> =>
   usePolled<CandidateRow[]>(ENDPOINTS.candidates, (d) => d.length === 0);

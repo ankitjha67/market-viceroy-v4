@@ -1,0 +1,12 @@
+# Prometheus scrape config for the optional observability overlay (Phase 14).
+# The API serves /metrics in exposition format (zero-dep, hand-rendered from
+# the same providers the deck reads). host.docker.internal reaches the
+# loopback-bound mv-serve from inside the container on Windows/macOS Docker.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: market-viceroy
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8000"]

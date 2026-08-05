@@ -212,7 +212,7 @@ The decision layer has two interchangeable engines behind one seam: the determin
 |---|---|---|---|
 | Technical analysts (the 9-strategy roster) | Per-strategy signals over the rolling window | Signals only; no sizing authority | IMPLEMENTED |
 | Regime detector | Kaufman efficiency ratio to trend/meanrev family weights | Market-structure input, never PnL | IMPLEMENTED |
-| News / Macro / Flow / Fundamentals / Valuation / Sentiment analysts | Feature-based stances | Degrade to neutral, low confidence when their feature is absent | PARTIAL: implemented, but the live loop passes signals only, so these six run neutral (Section 13) |
+| News / Macro / Flow / Fundamentals / Valuation / Sentiment analysts | Feature-based stances | Degrade to neutral, low confidence when their feature is absent | IMPLEMENTED: the loop now feeds `news_sentiment`, `sentiment`, `flow`, `regime` (Phase 14, R8); fundamentals/valuation stay honestly neutral (no crypto fundamentals) |
 | Bull / Bear | Structured debate over analyst views | Claims must cite views | IMPLEMENTED |
 | Research Manager | Weighs the debate into a verdict | Cannot size or execute | IMPLEMENTED |
 | Portfolio Manager | Buy/Sell/Hold + target size proposal | Bounded by the risk engine | IMPLEMENTED |
@@ -275,13 +275,14 @@ The remaining catalog (cross-sectional, multi-leg, macro panels) needs instrumen
 
 | Module | Purpose | Live wiring |
 |---|---|---|
-| News + sentiment | RSS to per-instrument lexicon scores | IMPLEMENTED, display-only (deck panel); agent feature feed is Wave 2 |
+| News + sentiment | RSS + GDELT to per-instrument lexicon scores | IMPLEMENTED: deck panel AND the agents' `news_sentiment` feature (Phase 14) |
+| Market intel (Fear & Greed, perp funding + OI, Reddit social) | Keyless / official-API sources on a slow refresh | IMPLEMENTED: `GET /api/v1/intel`, deck panel, and the agents' `sentiment` / `flow` features (Phase 14) |
 | Feature store / as-of / leakage | Point-in-time features | DORMANT in live decisions (tested; nothing populates `AgentContext.features`) |
 | Indicators library | Shared technical indicators | DORMANT (live strategies compute their own) |
 | SEC EDGAR | Point-in-time fundamentals by filing date | DORMANT (research only) |
 | Forecasting (GBM; LSTM/FinBERT extras) | Point-in-time forecasters, FRED-guarded | DORMANT (not in the decision path) |
 | Arbitrage (cross-exchange, triangular, funding) | After-cost, R/A/G-flagged opportunity detection | DORMANT in serve (offline script + endpoint provider unwired) |
-| GEX / Vol Desk | Dealer-gamma setup grading, exits, regime gates | IMPLEMENTED logic, mock-fed only (real options GEX data is a paid-vendor decision) |
+| GEX / Vol Desk | Dealer-gamma setup grading, exits, regime gates + a real GEX engine over Deribit chains (flip, +GEX, mass centers, dealer delta) | IMPLEMENTED with a free real-data path (`scripts/run_gex.py`); background serve wiring PLANNED |
 | MLflow tracking | Experiment logging (opt-in store) | DORMANT (not called by any runtime loop) |
 
 The single highest-leverage intelligence upgrade is passing features into `AgentContext` (Wave 2): it activates six analysts at once with code that already exists.
@@ -348,8 +349,8 @@ Status: IMPLEMENTED (CI-tested stages; offline runner `scripts/run_gate.py`; inv
 | Fees | Per-venue maker/taker bps (Binance 10/10, Kraken 16/26, Coinbase 40/60), applied in-venue on every paper fill | IMPLEMENTED |
 | Slippage/impact | Depth-aware: half-spread + concave impact by order-notional vs depth | DORMANT in fills (wired only into arbitrage detection); realized fill-vs-intended slippage is journaled per fill. Wiring into fills + a liquidity size cap is Wave 1 |
 | Live recalibration (FR-X4) | Realized-slippage recalibration + calibration store write-back | IMPLEMENTED (write-back consumed by the cost model seam) |
-| Funding / borrow | Perp funding accrual on held positions | PLANNED (Wave 1; funding exists only as an arb signal today) |
-| India crypto tax | 30 percent on gains + 1 percent TDS model | DORMANT (module tested, not applied to reported PnL); Wave 1 |
+| Funding / borrow | Perp funding accrual on held positions | PLANNED (the book is spot-only; live funding RATES now feed the `flow` feature and the deck, Phase 14) |
+| India crypto tax | 30 percent on gains + 1 percent TDS | PARTIAL (Phase 14): applied to realized round trips in the metrics panel (`tax_drag`, `after_tax_pnl`); per-fill ledger accounting PLANNED |
 | Backtest costs | Flat commission bps + optional slippage bps via the vectorbt bridge | IMPLEMENTED (gate default: commission 5 bps) |
 
 ## 19. Paper trading architecture
@@ -456,7 +457,7 @@ Today: signed conviction in [-1, 1] x max_position_pct x per-symbol equity slice
 | PnL/exposure monitors | Deck panels (equity, day PnL, drawdown, exposures) polled live | IMPLEMENTED (display; automated de-risking depends on R1) |
 | Bar sanity | Staleness guard (2x timeframe) + empty-frame rejection | PARTIAL: no OHLC sanity, gap, or outlier-wick guard at the bar boundary (Wave 1) |
 | Halt awareness | None (halts read as staleness and fail over, which could source a price around a real halt) | Halt/limit-band state machine before equities (Wave 3) |
-| Stress scenarios | None at book level (single-trade counterfactual replay exists) | Scenario engine: gap, vol spike, correlation-to-one, liquidity drought (Wave 4) |
+| Stress scenarios | Swarm scenario simulator v1 (Phase 14): seeded agent-crowd paths under news-shock / euphoria / liquidity-drought presets | PARTIAL: engine shipped; wiring into a risk report + book-level calibration (Wave 4) |
 | Crisis de-grossing | Static caps only | Vol-targeted exposure controller (Wave 2) |
 
 ## 27. Learning and governed adaptation
@@ -519,13 +520,14 @@ Adopted from the reference design and current SEBI/NSE framework; to be revalida
 | Performance | `/api/v1/metrics` JSON panel (Sharpe, Sortino, win rate, profit factor, expectancy, max DD) | IMPLEMENTED |
 | Journal | Filterable journal explorer endpoint + UI | IMPLEMENTED |
 | Real-time push | Authed WebSocket `/ws/stream` with polling fallback | PARTIAL (the serve loop does not publish to the hub yet; polling is the guaranteed path) |
-| Metrics retention | In-memory per process | PARTIAL (history ring buffer only) |
+| Prometheus exposition | `GET /metrics` rendered zero-dep from the deck's own providers + an optional Prometheus/Grafana compose overlay (loopback-only) | IMPLEMENTED (Phase 14); dashboards + alert rules PLANNED |
+| Metrics retention | In-memory per process (Prometheus retains once the overlay runs) | PARTIAL |
 
 ### 31.2 Gaps (target design)
 
 | Gap | Target | Wave |
 |---|---|---|
-| Prometheus/Grafana | Exporter + dashboards (compose profile exists for later use) | 4 |
+| Grafana dashboards + alert ladder | Curated dashboards and S0-S3 alert rules on the shipped `/metrics` + overlay | 4 |
 | Alerting | Severity ladder S0 (runaway orders, kill failure) to S3 (cosmetic), each alert with owner and dedup key | 4 |
 | Durable journal in serve | The loop rebuilds an in-memory `Journal()` per tick; the tested Postgres store is unwired, so the tamper-evident log is ephemeral across restarts | 1 |
 | Incident records + runbooks RB-01..08 (broker down, unknown order, stale feed, position mismatch, loss stop, bad release, credential compromise, corporate-action error) | Adopt the reference runbook set; today's implemented subset is kill/reset, ladder failover, and staleness halts | 4 |
@@ -595,9 +597,9 @@ Ordered by risk; each item cites its section.
 | R3 | Wire depth-aware slippage + liquidity size cap into paper fills | 18, 20 | 1 |
 | R4 | Switch the loop to reconciled multi-source reads; drop the hardcoded reconcile flag | 24 | 1 |
 | R5 | Durable journal in serve (stop per-tick rebuild; wire the Postgres store) | 31.2 | 1 |
-| R6 | Accrue perp funding; apply the India tax model to reported PnL | 18 | 1 |
+| R6 | Accrue perp funding; apply the India tax model to reported PnL | 18 | 1 (PARTIAL: tax drag + after-tax PnL shipped in Phase 14; funding accrual awaits a perp instrument) |
 | R7 | Bar-boundary guards: OHLC sanity, gap/outlier detection | 26 | 1 |
-| R8 | Populate `AgentContext.features` (activates six analysts) | 13 | 2 |
+| R8 | Populate `AgentContext.features` (activates the dormant analysts) | 13 | DONE (Phase 14) |
 | R9 | Risk-based sizing; rename the static kelly cap to what it is | 25.4 | 2 |
 | R10 | Wire attribution/replay/arbitrage providers into serve | 27 | 2 |
 | R11 | Persist adopted inventor candidates across restarts | 30 | 2 |
@@ -674,7 +676,11 @@ Maintenance cadence:
 | Arbitrage detection (after-cost, R/A/G) | `mv-intelligence/arbitrage` | IMPLEMENTED (offline; serve provider DORMANT) |
 | Forecasting (GBM; deep extras) + MLflow | `mv-intelligence` | DORMANT |
 | Command Deck (10 screens, dark terminal tokens) | `mv-ui` | IMPLEMENTED |
-| Prometheus / Grafana / alerting | none | PLANNED |
+| Phase-14 intel sources (funding, Fear & Greed, GDELT, Reddit official, Deribit, 13F, prediction markets) | `mv-failover/adapters/funding_feed.py`, `mv-intelligence/sources/` | IMPLEMENTED (wired to features + `GET /api/v1/intel` + deck) |
+| GEX engine (real chain to levels) + offline runner | `mv-intelligence/gex/engine.py`, `scripts/run_gex.py` | IMPLEMENTED |
+| Options payoff analytics | `mv-intelligence/options_payoff.py` | IMPLEMENTED (analysis; no options trading) |
+| Swarm scenario simulator | `mv-intelligence/swarm/` | IMPLEMENTED (risk-report wiring PLANNED) |
+| Prometheus exposition + observability overlay | `mv-api/prom.py` (`GET /metrics`), `docker-compose.observability.yml` | IMPLEMENTED (dashboards/alerting PLANNED) |
 | Shadow mode / OMS state machine / broker execution adapter | none | PLANNED |
 | Instrument master / corporate actions / session calendars | none | PLANNED |
 
@@ -682,7 +688,7 @@ Maintenance cadence:
 
 | Decision | Question | Blocking |
 |---|---|---|
-| Options data vendor | Paid chain/GEX source (Polygon or alternative) for real vol surfaces | GEX go-live, options strategies beyond synthetic |
+| Options data vendor | RESOLVED for crypto (Phase 14): Deribit public chains feed the GEX engine keyless. Still open for US equity options (Polygon or alternative) | Equity GEX / equity options strategies |
 | India execution broker | Which broker API executes (data ladder already Dhan-first) | Shadow mode, India live |
 | LLM routing defaults | Which agents route to Ollama vs cloud when enabled | Agent-mode depth (safe default: deterministic) |
 | India private repos | Fold in `india-preopen-quant-engine` and `nse-market-intel` content | India strategy breadth (Operator to provide) |

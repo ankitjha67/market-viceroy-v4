@@ -4,8 +4,9 @@ Two honest sources, kept separate from the backtest/validation Sharpe (that live
 in the Strategy Lab gate): **trade statistics** over the journal's closed round
 trips (win rate, profit factor, expectancy, avg/largest win-loss, a per-trade
 Sharpe/Sortino) and **equity-curve risk** over the live session's per-tick equity
-(max drawdown, total return). Money is ``Decimal``; ratios are floats rendered as
-strings. Pure / deterministic, stdlib only — no numpy, no I/O.
+(max drawdown, total return), plus the India crypto-tax drag on realized trades
+(Phase 14). Money is ``Decimal``; ratios are floats rendered as strings. Pure /
+deterministic — no numpy, no I/O (the tax model is a pure dataclass).
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import statistics
 from decimal import Decimal
 from typing import Any
 
+from alphakit.bridges.cost_model import IndiaCryptoTax
 from mv.postmortem.trades import ClosedTrade
 
 _ZERO = Decimal("0")
@@ -86,6 +88,19 @@ def performance_metrics(equity_curve: list[Decimal], trades: list[ClosedTrade]) 
     last = equity_curve[-1] if equity_curve else _ZERO
     total_return = (last - start) / start if start > _ZERO else 0.0
 
+    # India crypto tax on the realized round trips (Phase 14, FR-X2 honesty):
+    # 30 percent flat on each winning trade (no loss offset) + 1 percent TDS on
+    # the exit transfer value. Reported as a drag line beside the pre-tax net,
+    # so the deck never overstates what an India-resident Operator would keep.
+    tax_model = IndiaCryptoTax()
+    tax_drag = sum(
+        (
+            tax_model.total(gain=t.net_pnl(), transfer_notional=t.exit_fill_price * t.qty)
+            for t in trades
+        ),
+        _ZERO,
+    )
+
     return {
         "n_trades": str(n),
         "win_rate": str(round(len(wins) / n, 4)) if n else "0",
@@ -98,6 +113,8 @@ def performance_metrics(equity_curve: list[Decimal], trades: list[ClosedTrade]) 
         "gross_profit": str(gross_profit),
         "gross_loss": str(gross_loss),
         "total_pnl": str(sum(pnls, _ZERO)),
+        "tax_drag": str(tax_drag),
+        "after_tax_pnl": str(sum(pnls, _ZERO) - tax_drag),
         "sharpe": str(round(_sharpe(returns), 3)),
         "sortino": str(round(_sortino(returns), 3)),
         "max_drawdown": str(round(float(_max_drawdown(equity_curve)), 4)),

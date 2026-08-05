@@ -71,6 +71,7 @@ export const ENDPOINTS = {
   metrics: "/api/v1/metrics",
   trades: "/api/v1/trades",
   news: "/api/v1/news",
+  intel: "/api/v1/intel",
   candidates: "/api/v1/candidates",
   positions: "/api/v1/positions",
   decisions: "/api/v1/decisions",
