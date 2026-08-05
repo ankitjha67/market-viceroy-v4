@@ -7,6 +7,7 @@ import {
   useHealth,
   useHistory,
   useImprovements,
+  useIntel,
   useMetrics,
   useMistakes,
   useNews,
@@ -40,6 +41,7 @@ export function LiveDashboard() {
   const metrics = useMetrics();
   const trades = useTrades();
   const news = useNews();
+  const intel = useIntel();
   const positions = usePositions();
   const decisions = useDecisions();
   const sources = useSourceHealth();
@@ -138,8 +140,52 @@ export function LiveDashboard() {
             <Stat label="Total P&L" value={formatMoney(m.total_pnl ?? "0")} sign={m.total_pnl} />
             <Stat label="Max DD" value={formatPct(m.max_drawdown ?? "0")} />
             <Stat label="Trades" value={m.n_trades ?? "0"} />
+            <Stat label="Tax drag (IN)" value={formatMoney(m.tax_drag ?? "0")} />
+            <Stat
+              label="After-tax P&L"
+              value={formatMoney(m.after_tax_pnl ?? "0")}
+              sign={m.after_tax_pnl}
+            />
             <Stat label="Avg win" value={formatMoney(m.avg_win ?? "0")} sign={m.avg_win} />
             <Stat label="Avg loss" value={formatMoney(m.avg_loss ?? "0")} sign={m.avg_loss} />
+          </div>
+        </StatePanel>
+      </section>
+
+      <section className={styles.panel} aria-label="Market intel">
+        <div className={styles.tileHead}>
+          <h2 className={styles.panelTitle}>Market intel</h2>
+          <span className={styles.note}>fear &amp; greed · perp funding · social</span>
+        </div>
+        <StatePanel
+          state={intel.state}
+          error="Intel feed unavailable."
+          emptyMessage="No intel readings yet."
+        >
+          <div className={styles.metricGrid}>
+            <Stat
+              label="Fear & Greed"
+              value={
+                intel.data?.fear_greed
+                  ? `${intel.data.fear_greed.value} · ${intel.data.fear_greed.label}`
+                  : "no reading"
+              }
+              sign={intel.data?.fear_greed ? String(intel.data.fear_greed.score) : undefined}
+            />
+            {Object.entries(intel.data?.funding ?? {})
+              .sort(([, a], [, b]) => Math.abs(b.rate) - Math.abs(a.rate))
+              .slice(0, 5)
+              .map(([sym, f]) => (
+                <Stat key={sym} label={`${sym} funding`} value={`${(f.rate * 10000).toFixed(2)} bp`} />
+              ))}
+            {Object.entries(intel.data?.social ?? {}).map(([sub, score]) => (
+              <Stat
+                key={sub}
+                label={`r/${sub}`}
+                value={formatNum(String(score), 2)}
+                sign={String(score)}
+              />
+            ))}
           </div>
         </StatePanel>
       </section>

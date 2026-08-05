@@ -64,6 +64,7 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         live_guard: LiveGuardConfig | None = None,
         categories: Mapping[str, str] | None = None,
         regime_adaptive: bool = True,
+        features: Mapping[str, float] | None = None,
     ) -> None:
         super().__init__()
         self._instrument = instrument
@@ -80,6 +81,10 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         # Regime-adaptive ensemble weighting: when on (default) and categories are
         # known, the family weights track the detected market regime each bar.
         self._categories = categories if regime_adaptive else None
+        # Point-in-time intel features for the agent path (Phase 14, FR-A2): the
+        # serve loop refreshes these on a news cadence; an absent key means no
+        # coverage and the matching analyst degrades to neutral honestly.
+        self._features: Mapping[str, float] = dict(features or {})
         self._closes: list[float] = []
         self._times: list[datetime] = []
         self._position_notional = Decimal("0")
@@ -245,7 +250,13 @@ class AgentGraphStrategy(EnsembleStrategy):
         self, window: pd.DataFrame, ts: datetime, snapshot_id: str, state: PortfolioState
     ) -> GatedDecision:
         signals = strategy_signals(self._strategies, window, self._symbol)
-        ctx = AgentContext(instrument=self._symbol, ts=ts, snapshot_id=snapshot_id, signals=signals)
+        ctx = AgentContext(
+            instrument=self._symbol,
+            ts=ts,
+            snapshot_id=snapshot_id,
+            features=self._features,
+            signals=signals,
+        )
         return run_decision(self._graph, ctx, portfolio_state=state, equity=self._equity)
 
     def _record(self, gated: GatedDecision) -> None:
@@ -270,6 +281,7 @@ def run_paper_session(
     live_guard: LiveGuardConfig | None = None,
     categories: Mapping[str, str] | None = None,
     regime_adaptive: bool = True,
+    features: Mapping[str, float] | None = None,
 ) -> Any:
     """Run one paper session over ``frame`` and return the engine (for inspection).
 
@@ -298,6 +310,7 @@ def run_paper_session(
         live_guard=live_guard,
         categories=categories,
         regime_adaptive=regime_adaptive,
+        features=features,
     )
     engine.add_data(bars_from_frame(frame, bar_type, instrument))
     engine.add_strategy(strategy)

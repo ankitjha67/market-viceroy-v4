@@ -10,6 +10,7 @@ vi.mock("@/lib/hooks", () => ({
   useMetrics: vi.fn(),
   useTrades: vi.fn(),
   useNews: vi.fn(),
+  useIntel: vi.fn(),
   usePositions: vi.fn(),
   useDecisions: vi.fn(),
   useSourceHealth: vi.fn(),
@@ -118,6 +119,14 @@ function setup(over: Partial<Record<string, Polled<unknown>>> = {}) {
         ],
       })) as any,
   );
+  vi.mocked(hooks.useIntel).mockReturnValue(
+    (over.useIntel ??
+      polled("loaded", {
+        fear_greed: { value: 72, label: "Greed", score: 0.44 },
+        funding: { "BTC/USDT": { rate: 0.00012, open_interest: 91000 } },
+        social: { CryptoCurrency: 0.31 },
+      })) as any,
+  );
   vi.mocked(hooks.usePositions).mockReturnValue(
     (over.usePositions ??
       polled("loaded", [
@@ -215,6 +224,22 @@ describe("LiveDashboard", () => {
     setup({ usePositions: polled("empty", []) });
     render(<LiveDashboard />);
     expect(screen.getByText(/No positions/)).toBeInTheDocument();
+  });
+
+  it("renders the market-intel panel with fear-greed, funding, and social", () => {
+    setup();
+    render(<LiveDashboard />);
+    expect(screen.getByText("Market intel")).toBeInTheDocument();
+    expect(screen.getByText("72 · Greed")).toBeInTheDocument();
+    expect(screen.getByText("BTC/USDT funding")).toBeInTheDocument();
+    expect(screen.getByText("1.20 bp")).toBeInTheDocument(); // 0.00012 as basis points
+    expect(screen.getByText("r/CryptoCurrency")).toBeInTheDocument();
+  });
+
+  it("shows the intel empty state when nothing has been read yet", () => {
+    setup({ useIntel: polled("empty", { fear_greed: null, funding: {}, social: {} }) });
+    render(<LiveDashboard />);
+    expect(screen.getByText("No intel readings yet.")).toBeInTheDocument();
   });
 
   it("surfaces the live market regime when adaptive weighting is on", () => {

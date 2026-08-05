@@ -40,6 +40,11 @@ def test_trade_stats_winrate_and_profit_factor() -> None:
     assert m["total_pnl"] == "5"
     assert m["largest_win"] == "10"
     assert m["largest_loss"] == "-5"
+    # India crypto tax (Phase 14): 30% of the +10 gain (3.00, no loss offset)
+    # + 1% TDS on each exit transfer (1.10 + 0.95) = 5.05 drag — an honestly
+    # NEGATIVE after-tax result on a gross-positive session.
+    assert m["tax_drag"] == "5.05"
+    assert m["after_tax_pnl"] == "-0.05"
 
 
 def test_profit_factor_capped_when_no_losses() -> None:

@@ -67,6 +67,24 @@ export interface NewsData {
   headlines: NewsHeadline[];
 }
 
+/** Market intel (Phase 14): Fear & Greed + perp funding/OI + social sentiment. */
+export interface IntelFearGreed {
+  value: number;
+  label: string;
+  score: number;
+}
+
+export interface IntelFunding {
+  rate: number;
+  open_interest: number | null;
+}
+
+export interface IntelData {
+  fear_greed: IntelFearGreed | null;
+  funding: Record<string, IntelFunding>;
+  social: Record<string, number>;
+}
+
 /** One graded strategy candidate from the inventor (with its gate evidence). */
 export interface CandidateRow {
   name: string;

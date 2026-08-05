@@ -215,6 +215,40 @@ def test_agent_graph_loop_journals_full_transcript_and_fills() -> None:
         engine.dispose()
 
 
+def test_agent_loop_receives_intel_features_end_to_end() -> None:
+    # Phase 14 (R8): features passed to the session reach the analysts — the
+    # sentiment analyst goes bullish on a strong reading instead of degrading
+    # to neutral, proving the sources -> features -> agents wire end to end.
+    journal = Journal()
+    risk = RiskEngine(RiskLimits.aggressive(), KillSwitch())
+    instrument = TestInstrumentProvider.btcusdt_binance()
+
+    engine = run_paper_session(
+        frame=_rising_frame(40),
+        symbol="BTC/USDT",
+        timeframe="1h",
+        strategies=_strategies(),
+        risk_engine=risk,
+        journal=journal,
+        instrument=instrument,
+        warmup=30,
+        starting_equity=Decimal("1000000"),
+        use_agents=True,
+        features={"sentiment": 0.9, "flow": 0.8},
+    )
+    try:
+        views = [e.payload for e in journal.entries() if e.kind == "analyst_view"]
+        sentiment_views = [v for v in views if v.get("agent") == "sentiment_analyst"]
+        flow_views = [v for v in views if v.get("agent") == "flow_analyst"]
+        news_views = [v for v in views if v.get("agent") == "news_analyst"]
+        assert sentiment_views and all(v["stance"] == "bullish" for v in sentiment_views)
+        assert flow_views and all(v["stance"] == "bullish" for v in flow_views)
+        # An absent feature still degrades to neutral (no fabricated coverage).
+        assert news_views and all(v["stance"] == "neutral" for v in news_views)
+    finally:
+        engine.dispose()
+
+
 def test_live_mode_blocks_ungraduated_strategy() -> None:
     # BR-005: in live mode an ungraduated symbol produces no order — journaled.
     from mv.risk.live_guard import LiveGuardConfig
