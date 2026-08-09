@@ -24,6 +24,7 @@ class Holding:
     cusip: str
     value_kusd: int
     shares: int
+    put_call: str = ""  # "", "Put" or "Call" -- an option line is not the stock
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +52,7 @@ def parse_information_table(xml_text: str) -> list[Holding]:
         fields: dict[str, str] = {}
         for child in element.iter():
             name = _local(child.tag)
-            if child.text and name in ("nameOfIssuer", "cusip", "value", "sshPrnamt"):
+            if child.text and name in ("nameOfIssuer", "cusip", "value", "sshPrnamt", "putCall"):
                 fields.setdefault(name, child.text.strip())
         try:
             out.append(
@@ -60,6 +61,7 @@ def parse_information_table(xml_text: str) -> list[Holding]:
                     cusip=fields["cusip"],
                     value_kusd=int(float(fields["value"])),
                     shares=int(float(fields["sshPrnamt"])),
+                    put_call=fields.get("putCall", ""),
                 )
             )
         except (KeyError, ValueError):
@@ -67,40 +69,60 @@ def parse_information_table(xml_text: str) -> list[Holding]:
     return out
 
 
-def aggregate_by_cusip(holdings: list[Holding]) -> dict[str, Holding]:
-    """Sum multi-row positions (filers split lots) into one row per CUSIP."""
-    merged: dict[str, Holding] = {}
+def aggregate_by_cusip(holdings: list[Holding]) -> dict[tuple[str, str], Holding]:
+    """Sum a filer's split lots into one row per (CUSIP, put/call).
+
+    Keyed on the security TYPE as well as the issuer: a protective put and the
+    common stock share a CUSIP, so merging on CUSIP alone added an option line
+    into the share count and inverted the read for any filer that hedges.
+    """
+    merged: dict[tuple[str, str], Holding] = {}
     for h in holdings:
-        prev = merged.get(h.cusip)
+        key = (h.cusip, h.put_call)
+        prev = merged.get(key)
         if prev is None:
-            merged[h.cusip] = h
+            merged[key] = h
         else:
-            merged[h.cusip] = Holding(
+            merged[key] = Holding(
                 issuer=prev.issuer,
                 cusip=h.cusip,
                 value_kusd=prev.value_kusd + h.value_kusd,
                 shares=prev.shares + h.shares,
+                put_call=h.put_call,
             )
     return merged
 
 
 def holdings_diff(previous: list[Holding], current: list[Holding]) -> list[HoldingChange]:
-    """Quarter-over-quarter position changes, largest absolute value move first."""
+    """Quarter-over-quarter position changes, largest absolute share move first.
+
+    Classified on SHARE COUNT, not market value. 13F ``value`` is shares times
+    the quarter-end price, so a value diff conflates the filer's decision with
+    the price move: a filer who 2.5x'd a position into a falling price showed as
+    "no change", and one who did nothing through a rally showed as "increased".
+    Shares are the only price-independent quantity a 13F reports.
+    """
     prev = aggregate_by_cusip(previous)
     cur = aggregate_by_cusip(current)
     changes: list[HoldingChange] = []
-    for cusip, holding in cur.items():
-        before = prev.get(cusip)
+    for key, holding in cur.items():
+        before = prev.get(key)
         if before is None:
-            changes.append(HoldingChange(holding.issuer, cusip, "new", 0, holding.value_kusd))
-        elif holding.value_kusd != before.value_kusd:
-            kind = "increased" if holding.value_kusd > before.value_kusd else "decreased"
             changes.append(
-                HoldingChange(holding.issuer, cusip, kind, before.value_kusd, holding.value_kusd)
+                HoldingChange(holding.issuer, holding.cusip, "new", 0, holding.value_kusd)
             )
-    for cusip, holding in prev.items():
-        if cusip not in cur:
-            changes.append(HoldingChange(holding.issuer, cusip, "exited", holding.value_kusd, 0))
+        elif holding.shares != before.shares:
+            kind = "increased" if holding.shares > before.shares else "decreased"
+            changes.append(
+                HoldingChange(
+                    holding.issuer, holding.cusip, kind, before.value_kusd, holding.value_kusd
+                )
+            )
+    for key, holding in prev.items():
+        if key not in cur:
+            changes.append(
+                HoldingChange(holding.issuer, holding.cusip, "exited", holding.value_kusd, 0)
+            )
     return sorted(
         changes, key=lambda c: abs(c.value_kusd_after - c.value_kusd_before), reverse=True
     )

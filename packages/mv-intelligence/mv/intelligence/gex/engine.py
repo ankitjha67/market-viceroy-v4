@@ -68,10 +68,13 @@ def gamma_profile(chain: list[OptionSummary], *, as_of: datetime) -> GammaProfil
     ``gamma * OI * spot^2 * 0.01`` with calls positive and puts negative
     (dollar gamma per 1 percent move, contract multiplier 1 as on Deribit).
     """
-    live = [o for o in chain if o.expiry > as_of and o.open_interest > 0]
+    live = [o for o in chain if o.expiry > as_of and o.open_interest > 0 and o.mark_iv > 0]
     if not live:
         return None
-    spot = live[-1].underlying
+    # Deribit reports the per-expiry FORWARD as underlying_price and payload
+    # order is not guaranteed, so taking whichever row happened to be last made
+    # every level depend on input ordering. Anchor on the nearest expiry.
+    spot = min(live, key=lambda o: o.expiry).underlying
     if spot <= 0:
         return None
 
@@ -100,29 +103,39 @@ def gamma_profile(chain: list[OptionSummary], *, as_of: datetime) -> GammaProfil
     profile = tuple((k, by_strike[k]) for k in strikes)
 
     # Flip level: where the cumulative net GEX (ascending strikes) crosses zero.
+    # The flip is the cumulative-GEX zero crossing in EITHER direction: a
+    # put-heavy upper chain crosses positive-to-negative, and only testing the
+    # negative-to-positive case reported the flip at the last strike (well wide
+    # of spot, and on the wrong side of it).
     cumulative = 0.0
-    zero_gex = strikes[0]
+    zero_gex: float | None = None
     prev_strike, prev_cum = strikes[0], 0.0
     for strike in strikes:
         cumulative += by_strike[strike]
-        if prev_cum < 0.0 <= cumulative and cumulative != prev_cum:
+        crosses_up = prev_cum < 0.0 <= cumulative
+        crosses_down = prev_cum > 0.0 >= cumulative
+        if (crosses_up or crosses_down) and cumulative != prev_cum:
             frac = -prev_cum / (cumulative - prev_cum)
             zero_gex = prev_strike + frac * (strike - prev_strike)
             break
         prev_strike, prev_cum = strike, cumulative
-    else:
-        zero_gex = strikes[0] if cumulative >= 0 else strikes[-1]
 
     positive = [(k, v) for k, v in profile if v > 0]
-    plus_gex = max(positive, key=lambda kv: kv[1])[0] if positive else strikes[-1]
     total_delta = call_delta_mass + put_delta_mass
+    # A chain with no measurable gamma (illiquid rows quote mark_iv 0) cannot
+    # produce levels. Report NO PROFILE rather than inventing a flip at the
+    # first strike, a magnet at the last, and a "balanced" 0.5 dealer delta
+    # that is indistinguishable from a genuine reading.
+    if zero_gex is None or not positive or total_delta <= 0.0:
+        return None
+    plus_gex = max(positive, key=lambda kv: kv[1])[0]
     return GammaProfile(
         spot=spot,
         zero_gex=zero_gex,
         plus_gex=plus_gex,
         cotmp=put_center / put_mass if put_mass else strikes[0],
         cotmc=call_center / call_mass if call_mass else strikes[-1],
-        dealer_delta=call_delta_mass / total_delta if total_delta else 0.5,
+        dealer_delta=call_delta_mass / total_delta,
         total_gex=sum(v for _, v in profile),
         by_strike=profile,
     )

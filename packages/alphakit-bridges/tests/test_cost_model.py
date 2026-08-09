@@ -61,7 +61,13 @@ def test_india_tax_on_gain_and_tds() -> None:
     assert tax.on_gain(Decimal("1000")) == Decimal("300")  # 30%
     assert tax.on_gain(Decimal("-1000")) == Decimal("0")  # no tax on a loss
     assert tax.tds(Decimal("10000")) == Decimal("100")  # 1%
-    assert tax.total(Decimal("1000"), Decimal("10000")) == Decimal("400")
+    # TDS is WITHHELD tax credited against the flat liability, not an additive
+    # expense: the drag is the liability once it exceeds the withholding.
+    assert tax.total(Decimal("1000"), Decimal("10000")) == Decimal("300")
+    # When the withholding exceeds the liability (a thin gain on a large
+    # notional) the cash out is the withholding; the excess is refundable but
+    # is not modelled as already reclaimed.
+    assert tax.total(Decimal("10"), Decimal("100000")) == Decimal("1000")
 
 
 # --- Live-fill slippage recalibration write-back (FR-X4) -------------------

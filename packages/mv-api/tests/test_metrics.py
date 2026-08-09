@@ -40,11 +40,42 @@ def test_trade_stats_winrate_and_profit_factor() -> None:
     assert m["total_pnl"] == "5"
     assert m["largest_win"] == "10"
     assert m["largest_loss"] == "-5"
-    # India crypto tax (Phase 14): 30% of the +10 gain (3.00, no loss offset)
-    # + 1% TDS on each exit transfer (1.10 + 0.95) = 5.05 drag — an honestly
-    # NEGATIVE after-tax result on a gross-positive session.
-    assert m["tax_drag"] == "5.05"
-    assert m["after_tax_pnl"] == "-0.05"
+    # India crypto tax (approximation, labelled). Per trade the drag is
+    # max(30% of the gross gain, 1% TDS on the sale) because TDS is withheld
+    # tax credited against the liability, not an additive expense:
+    #   winner  +10 gross -> max(3.00, 1% of 110 = 1.10) = 3.00
+    #   loser    -5 gross -> max(0.00, 1% of  95 = 0.95) = 0.95
+    assert m["tax_drag_approx"] == "3.95"
+    assert m["after_tax_pnl_approx"] == "1.05"  # +5 pre-tax, still positive
+    assert "TDS" in m["tax_basis"]
+
+
+def test_tds_uses_the_sale_leg_for_a_short_round_trip() -> None:
+    # Section 194S attaches to the sale. For a SHORT the sale is the ENTRY leg
+    # (the cover is a buy), so charging the exit under-withheld on every
+    # profitable short.
+    trades = _trades(("SELL", "1", "100"), ("BUY", "1", "60"))
+    m = performance_metrics([Decimal("5000")], trades)
+    # gross gain +40 -> liability 12.00; TDS on the 100 sale = 1.00 -> max = 12.
+    assert Decimal(m["tax_drag_approx"]) == Decimal("12")
+
+
+def test_taxable_gain_is_gross_of_fees() -> None:
+    # 115BBH allows only cost of acquisition; brokerage is not deductible, so
+    # the tax base must not be the fee-netted PnL.
+    fills = [_fill("BUY", "1", "100"), _fill("SELL", "1", "110")]
+    fills[1] = Fill(
+        instrument="BTC/USDT",
+        side="SELL",
+        qty=Decimal("1"),
+        fill_price=Decimal("110"),
+        ts=_TS,
+        fees=Decimal("2"),
+    )
+    trades = reconstruct_closed_trades(fills)
+    m = performance_metrics([Decimal("5000")], trades)
+    # Gross gain is 10 (not 8 after the 2 of fees) -> liability 3.00 > TDS 1.10.
+    assert Decimal(m["tax_drag_approx"]) == Decimal("3")
 
 
 def test_profit_factor_capped_when_no_losses() -> None:

@@ -78,9 +78,18 @@ def mutate(
         others = [v for v in values if v != current]
         neighbor = rng.choice(others) if others else current
         midpoint = (current + neighbor) / 2
-        params[key] = (
+        candidate_value = (
             round(midpoint) if isinstance(current, int) and isinstance(neighbor, int) else midpoint
         )
+        # Adjacent integer grid values have no room between them (the midpoint
+        # rounds back onto a grid point), so interpolation would be a silent
+        # no-op. Fall back to a plain jump so the slot still produces something
+        # the grid does not already contain.
+        if candidate_value == current or candidate_value in values:
+            choices = [value for value in values if value != current]
+            params[key] = rng.choice(choices) if choices else current
+        else:
+            params[key] = candidate_value
     else:
         choices = [value for value in values if value != current]
         if choices:
@@ -125,13 +134,21 @@ def evolve(
         if a.strategy == b.strategy:
             offspring.append(crossover(a, b))
 
-    parent_set = set(parents)
-    seen: set[Candidate] = set()
+    # Dedup on the SPEC (template + params), not the whole Candidate: provenance
+    # is part of Candidate equality, and offspring always carry "genetic", so a
+    # spec-identical copy of a parent never matched and the generation filled up
+    # with candidates the grid had already produced.
+    def spec(candidate: Candidate) -> tuple[str, tuple[tuple[str, Any], ...]]:
+        return (candidate.strategy, candidate.params)
+
+    parent_specs = {spec(parent) for parent in parents}
+    seen: set[tuple[str, tuple[tuple[str, Any], ...]]] = set()
     fresh: list[Candidate] = []
     for candidate in offspring:
-        if candidate in parent_set or candidate in seen:
+        key = spec(candidate)
+        if key in parent_specs or key in seen:
             continue
-        seen.add(candidate)
+        seen.add(key)
         fresh.append(candidate)
     return fresh[:limit]
 

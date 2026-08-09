@@ -88,18 +88,25 @@ def performance_metrics(equity_curve: list[Decimal], trades: list[ClosedTrade]) 
     last = equity_curve[-1] if equity_curve else _ZERO
     total_return = (last - start) / start if start > _ZERO else 0.0
 
-    # India crypto tax on the realized round trips (Phase 14, FR-X2 honesty):
-    # 30 percent flat on each winning trade (no loss offset) + 1 percent TDS on
-    # the exit transfer value. Reported as a drag line beside the pre-tax net,
-    # so the deck never overstates what an India-resident Operator would keep.
+    # India crypto tax on the realized round trips (Phase 14, FR-X2 honesty).
+    # An APPROXIMATION, and labelled as one in the payload: per-trade rather
+    # than per-assessment-year, and the refundable TDS excess is treated as not
+    # yet reclaimed. Three modelling points that were wrong and now are not:
+    #   - the taxable gain is GROSS of fees (s.115BBH allows only cost of
+    #     acquisition; brokerage is not deductible), so netting fees first
+    #     under-taxed every winner;
+    #   - TDS attaches to the SALE leg, which for a short round trip is the
+    #     ENTRY, not the exit;
+    #   - TDS is withheld tax credited against the flat liability, not an
+    #     additive expense (see IndiaCryptoTax.total).
     tax_model = IndiaCryptoTax()
-    tax_drag = sum(
-        (
-            tax_model.total(gain=t.net_pnl(), transfer_notional=t.exit_fill_price * t.qty)
-            for t in trades
-        ),
-        _ZERO,
-    )
+    tax_drag = _ZERO
+    for trade in trades:
+        gross_gain = (
+            Decimal(trade.direction) * (trade.exit_fill_price - trade.entry_fill_price) * trade.qty
+        )
+        sale_price = trade.exit_fill_price if trade.direction > 0 else trade.entry_fill_price
+        tax_drag += tax_model.total(gain=gross_gain, transfer_notional=sale_price * trade.qty)
 
     return {
         "n_trades": str(n),
@@ -113,8 +120,9 @@ def performance_metrics(equity_curve: list[Decimal], trades: list[ClosedTrade]) 
         "gross_profit": str(gross_profit),
         "gross_loss": str(gross_loss),
         "total_pnl": str(sum(pnls, _ZERO)),
-        "tax_drag": str(tax_drag),
-        "after_tax_pnl": str(sum(pnls, _ZERO) - tax_drag),
+        "tax_drag_approx": str(tax_drag),
+        "after_tax_pnl_approx": str(sum(pnls, _ZERO) - tax_drag),
+        "tax_basis": "IN crypto: 30% on gross gains (no loss offset) + 1% TDS on sales, credited",
         "sharpe": str(round(_sharpe(returns), 3)),
         "sortino": str(round(_sortino(returns), 3)),
         "max_drawdown": str(round(float(_max_drawdown(equity_curve)), 4)),

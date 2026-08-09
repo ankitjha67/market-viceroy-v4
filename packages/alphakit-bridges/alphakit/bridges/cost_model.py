@@ -93,8 +93,19 @@ class IndiaCryptoTax:
         return transfer_notional.copy_abs() * self.tds_bps / _BPS
 
     def total(self, gain: Decimal, transfer_notional: Decimal) -> Decimal:
-        """Total tax drag entering net PnL."""
-        return self.on_gain(gain) + self.tds(transfer_notional)
+        """Total tax drag entering net PnL, with TDS credited against the tax.
+
+        TDS under s.194S is **withheld tax**, not an extra cost: it is credited
+        against the flat liability and refundable beyond it. Adding the two
+        together overstated the drag several-fold (on a large notional the 1
+        percent withholding dwarfs 30 percent of a thin gain) and could turn a
+        genuinely profitable trade into a reported after-tax loss. The economic
+        drag is the liability, or the withholding when that exceeds it and the
+        excess has not yet been reclaimed.
+        """
+        liability = self.on_gain(gain)
+        withheld = self.tds(transfer_notional)
+        return max(liability, withheld)
 
 
 # --- Live-fill slippage recalibration write-back (PRD FR-X4) ----------------
