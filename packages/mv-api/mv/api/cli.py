@@ -199,12 +199,12 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     realized = sum((t.net_pnl() for t in reconstruct_closed_trades(fills)), Decimal("0"))
     mode = "agents" if ns.agents else "ensemble"
     print(
-        f"[paper] {ns.symbol} {ns.timeframe} via {result.source} ({mode}, INR @ ₹{fx_rate}/USD): "
+        f"[paper] {ns.symbol} {ns.timeframe} via {result.source} ({mode}, INR @ {fx_rate}/USD): "
         f"{len(strategies)} strategies, {decisions} decisions, {len(fills)} fills, "
         f"{len(engine.cache.positions())} open positions"
     )
     print(
-        f"[paper]   realized P&L (closed trades): ₹{realized}  |  equity ~ ₹{start_equity + realized}"
+        f"[paper]   realized P&L (closed trades): INR {realized}  |  equity ~ INR {start_equity + realized}"
     )
     engine.dispose()
 
@@ -775,7 +775,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         print(
             f"[serve {stamp:%H:%M:%S}] {len(symbols)} symbols {ns.timeframe} via {source} "
             f"({mode}): {decisions} decisions, {len(fills)} fills, "
-            f"{len(positions)} positions, equity ₹{portfolio['equity']}"
+            f"{len(positions)} positions, equity INR {portfolio['equity']}"
         )
 
     run_tick()  # populate before serving
@@ -819,7 +819,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
 
     print(
         f"[serve] Command Deck API -> http://{ns.host}:{ns.port}/api/v1/health "
-        f"(currency INR @ ₹{fx_rate}/USD)"
+        f"(currency INR @ {fx_rate}/USD)"
     )
     print(
         f"[serve] start the UI: cd packages/mv-ui && npm install && "
