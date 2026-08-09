@@ -8,6 +8,7 @@ an entry, so the whole decision is reconstructable from the ledger.
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 from typing import Any
@@ -32,6 +33,12 @@ class Journal:
         self._entries: list[JournalEntry] = []
         self._store = store
         self._clock = clock if clock is not None else _utc_now
+        # Appending is a read-modify-write over the hash chain (read head, take
+        # seq, link, append). The API appends from request threads (e.g. the
+        # graduate endpoint) while the loop appends from the watch thread, so two
+        # interleaved appends could mint duplicate seq values sharing a prev_hash
+        # and make verify() report tampering on a chain nobody tampered with.
+        self._lock = threading.Lock()
 
     @property
     def head_hash(self) -> str | None:
@@ -43,22 +50,27 @@ class Journal:
         return len(self._entries)
 
     def append(self, kind: str, payload: Mapping[str, Any]) -> JournalEntry:
-        """Append an entry of ``kind`` carrying ``payload``; return it."""
-        prev_hash = self.head_hash
-        ts = self._clock()
-        seq = len(self._entries) + 1
-        entry = JournalEntry(
-            seq=seq,
-            ts=ts,
-            kind=kind,
-            payload=dict(payload),
-            prev_hash=prev_hash,
-            hash=entry_hash(prev_hash, ts, kind, payload),
-        )
-        self._entries.append(entry)
-        if self._store is not None:
-            self._store.append(entry)
-        return entry
+        """Append an entry of ``kind`` carrying ``payload``; return it.
+
+        Thread-safe: the chain link is taken under a lock so concurrent appends
+        cannot mint duplicate sequence numbers or fork the hash chain.
+        """
+        with self._lock:
+            prev_hash = self.head_hash
+            ts = self._clock()
+            seq = len(self._entries) + 1
+            entry = JournalEntry(
+                seq=seq,
+                ts=ts,
+                kind=kind,
+                payload=dict(payload),
+                prev_hash=prev_hash,
+                hash=entry_hash(prev_hash, ts, kind, payload),
+            )
+            self._entries.append(entry)
+            if self._store is not None:
+                self._store.append(entry)
+            return entry
 
     def verify(self) -> None:
         """Raise :class:`~mv.journal.chain.JournalTamperError` if the chain is broken."""

@@ -26,6 +26,7 @@ from mv.agents.baseline.runner import (
 )
 from mv.agents.graph import build_agent_graph, run_decision
 from mv.agents.roster.context import AgentContext
+from mv.api.intel import signed_efficiency
 from mv.journal.journal import Journal
 from mv.risk.engine import PortfolioState
 from mv.risk.engine import RiskEngine as _RiskEngine
@@ -65,6 +66,7 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         categories: Mapping[str, str] | None = None,
         regime_adaptive: bool = True,
         features: Mapping[str, float] | None = None,
+        features_as_of: datetime | None = None,
     ) -> None:
         super().__init__()
         self._instrument = instrument
@@ -81,10 +83,17 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         # Regime-adaptive ensemble weighting: when on (default) and categories are
         # known, the family weights track the detected market regime each bar.
         self._categories = categories if regime_adaptive else None
-        # Point-in-time intel features for the agent path (Phase 14, FR-A2): the
-        # serve loop refreshes these on a news cadence; an absent key means no
-        # coverage and the matching analyst degrades to neutral honestly.
-        self._features: Mapping[str, float] = dict(features or {})
+        # Point-in-time intel features for the agent path (Phase 14, FR-A2).
+        # ``features_as_of`` is the moment those readings became knowable: the
+        # session replays a whole window, so applying a current reading to every
+        # historical bar would be look-ahead. A bar earlier than the reading sees
+        # NO coverage (the matching analyst degrades to neutral, honestly);
+        # ``regime`` is excluded here because it is derived causally per bar from
+        # the closes the strategy has actually seen.
+        self._features: Mapping[str, float] = {
+            k: v for k, v in dict(features or {}).items() if k != "regime"
+        }
+        self._features_as_of = features_as_of
         self._closes: list[float] = []
         self._times: list[datetime] = []
         # The live position as a SIGNED QUANTITY (long > 0, short < 0). Notional
@@ -100,6 +109,21 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
     def bars_seen(self) -> list[float]:
         """Every bar close this strategy actually processed (halt detection)."""
         return self._closes
+
+    def _features_at(self, ts: datetime) -> dict[str, float]:
+        """The features knowable at bar ``ts`` (as-of; no look-ahead).
+
+        Intel readings apply only to bars at or after the moment they were
+        observed. ``regime`` is recomputed here from the closes seen so far, so
+        it is causal by construction rather than carried in from the caller.
+        """
+        out: dict[str, float] = {}
+        if self._features and (self._features_as_of is None or ts >= self._features_as_of):
+            out.update(self._features)
+        regime = signed_efficiency(self._closes)
+        if regime is not None:
+            out["regime"] = regime
+        return out
 
     def on_start(self) -> None:
         self.subscribe_bars(self._bar_type)
@@ -267,7 +291,7 @@ class AgentGraphStrategy(EnsembleStrategy):
             instrument=self._symbol,
             ts=ts,
             snapshot_id=snapshot_id,
-            features=self._features,
+            features=self._features_at(ts),
             signals=signals,
         )
         return run_decision(self._graph, ctx, portfolio_state=state, equity=self._equity)
@@ -295,6 +319,7 @@ def run_paper_session(
     categories: Mapping[str, str] | None = None,
     regime_adaptive: bool = True,
     features: Mapping[str, float] | None = None,
+    features_as_of: datetime | None = None,
 ) -> Any:
     """Run one paper session over ``frame`` and return the engine (for inspection).
 
@@ -324,6 +349,7 @@ def run_paper_session(
         categories=categories,
         regime_adaptive=regime_adaptive,
         features=features,
+        features_as_of=features_as_of,
     )
     bars = bars_from_frame(frame, bar_type, instrument)
     engine.add_data(bars)

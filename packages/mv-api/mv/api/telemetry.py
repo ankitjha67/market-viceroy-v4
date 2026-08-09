@@ -70,8 +70,14 @@ class SourceTelemetry:
 
     def view(self, source: str, *, at: float, window_s: float = 60.0) -> dict[str, Any]:
         """The measured health fields for ``source`` as of monotonic time ``at``."""
+        # Snapshot both deques before reading: the serve loop records fetches on
+        # the watch thread while request threads call view(). A generator over a
+        # live deque raises "deque mutated during iteration" mid-flight, which
+        # surfaced as a 500 on the health and Prometheus endpoints exactly when
+        # the loop was busiest. list() is atomic; the count runs over the copy.
         latencies = list(self._latency.get(source, ()))
-        recent = sum(1 for t in self._requests.get(source, ()) if at - t <= window_s)
+        request_times = list(self._requests.get(source, ()))
+        recent = sum(1 for t in request_times if at - t <= window_s)
         budget = budget_for(source)
         quota = min(100, round(100 * recent / budget)) if budget else 0
         p50 = round(percentile(latencies, 0.5))

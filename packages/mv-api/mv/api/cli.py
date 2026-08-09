@@ -241,7 +241,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     from mv.api.chart import chart_payload
     from mv.api.fx import scale_prices, usd_inr_rate
     from mv.api.instruments import crypto_instrument
-    from mv.api.intel import features_for, intel_payload, signed_efficiency
+    from mv.api.intel import features_for, intel_payload
     from mv.api.inventor_view import inventor_rows, run_crypto_inventor
     from mv.api.learning import mistakes_from_fills
     from mv.api.metrics import performance_metrics
@@ -384,7 +384,9 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     # zone); UTC internally everywhere else.
     day_start_equity = start_equity
     day_stamp = ""
-    news_state: dict[str, Any] = {"sentiment": {}, "headlines": []}
+    # A one-key holder so a refresh publishes by REBINDING the payload rather
+    # than mutating a dict that request threads may be serializing.
+    news_holder: dict[str, dict[str, Any]] = {"current": {"sentiment": {}, "headlines": []}}
     # Real source telemetry: the loop times every fetch into this, and the health
     # panel reports measured latency + request-rate quota (not placeholder zeros).
     telemetry = SourceTelemetry()
@@ -393,40 +395,72 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     def refresh_news() -> None:
         # Live crypto news -> per-instrument sentiment. Network + slow-moving, so
         # the loop refreshes it every few ticks, not every bar; a failure is
-        # non-fatal (the last snapshot stays).
+        # non-fatal (the last snapshot really does stay).
+        #
+        # Build the whole payload FIRST, then rebind in one statement. Clearing
+        # in place and refilling left the served dict empty for the duration of
+        # the (up to 90 second) fetch, which crashed the deck's news panel, and
+        # a mid-refresh exception wiped it until the next success. Rebinding also
+        # keeps request threads from serializing a dict being mutated.
         try:
-            news_state.clear()
-            news_state.update(news_payload(fetch_feeds(), symbols))
+            payload = news_payload(fetch_feeds(), symbols)
         except Exception as exc:  # news must never break serving
             print(f"[serve] news refresh skipped: {type(exc).__name__}: {exc}")
+            return
+        news_holder["current"] = payload
 
     # Market intel (Phase 14): Fear & Greed + perp funding (keyless) and, when the
     # Operator has Reddit API credentials in the env, official-API social
     # sentiment. Feeds the agents' features and GET /api/v1/intel. Same posture
     # as news: slow cadence, non-fatal, the last snapshot survives a bad refresh.
-    intel_state: dict[str, Any] = {"fear_greed": None, "funding": {}, "social": {}}
+    # One holder rebound atomically, plus the ``as_of`` stamp that makes the
+    # readings point-in-time: a reading is only knowable from the moment it was
+    # observed, so the session applies it to bars at or after that time.
+    intel_holder: dict[str, Any] = {
+        "current": {"fear_greed": None, "funding": {}, "social": {}, "as_of": None}
+    }
 
     def refresh_intel() -> None:
+        previous = intel_holder["current"]
+        fear_greed = previous.get("fear_greed")
+        funding = previous.get("funding") or {}
+        social = dict(previous.get("social") or {})
         try:
             readings = fetch_fear_greed(limit=1)
             if readings:
-                intel_state["fear_greed"] = readings[0]
+                fear_greed = readings[0]
         except Exception as exc:
             print(f"[serve] fear-greed refresh skipped: {type(exc).__name__}: {exc}")
         try:
-            intel_state["funding"] = fetch_funding_rates(symbols)
+            funding = fetch_funding_rates(symbols)
         except Exception as exc:
             print(f"[serve] funding refresh skipped: {type(exc).__name__}: {exc}")
         if os.environ.get("REDDIT_CLIENT_ID") and os.environ.get("REDDIT_CLIENT_SECRET"):
-            social: dict[str, float] = {}
+            fresh_social: dict[str, float] = {}
             for sub in CRYPTO_SUBREDDITS:
                 try:
                     score = social_sentiment(fetch_subreddit_posts(sub, limit=40))
                     if score is not None:
-                        social[sub] = score
+                        fresh_social[sub] = score
                 except Exception as exc:
                     print(f"[serve] reddit r/{sub} skipped: {type(exc).__name__}: {exc}")
-            intel_state["social"] = social
+            social = fresh_social
+        intel_holder["current"] = {
+            "fear_greed": fear_greed,
+            "funding": funding,
+            "social": social,
+            "as_of": datetime.now(timezone.utc),
+        }
+
+    def _intel_fields() -> dict[str, Any]:
+        """The three intel fields read from ONE snapshot (never field-by-field,
+        which could mix one refresh's mood with another's flow)."""
+        snapshot = intel_holder["current"]
+        return {
+            "fear_greed": snapshot["fear_greed"],
+            "funding": snapshot["funding"],
+            "social": snapshot["social"],
+        }
 
     # Strategy Inventor (Phase 13): a background search that grades candidate
     # strategies through the validation gate over the accumulated INR history and
@@ -570,12 +604,8 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         ohlcv_provider=lambda: view["ohlcv"],
         metrics_provider=metrics_view,
         trades_provider=trades_view,
-        news_provider=lambda: news_state,
-        intel_provider=lambda: intel_payload(
-            fear_greed=intel_state["fear_greed"],
-            funding=intel_state["funding"],
-            social=intel_state["social"],
-        ),
+        news_provider=lambda: news_holder["current"],
+        intel_provider=lambda: intel_payload(**_intel_fields()),
         risk_provider=risk_view,
         source_health_provider=source_health_view,
         mistakes_provider=mistakes_view,
@@ -607,19 +637,25 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
                 frames_inr[sym] = frame_inr
                 if frame_inr.height:
                     marks[sym] = Decimal(str(frame_inr.get_column("close").tail(1).item()))
-                # Point-in-time intel features (Phase 14): built per symbol from
-                # the latest snapshots; an absent key = no coverage (the matching
-                # analyst degrades to neutral instead of trading on a fabrication).
-                closes = [float(v) for v in frame_inr.get_column("close").to_list()]
+                # Point-in-time intel features (Phase 14): an absent key means no
+                # coverage (the matching analyst degrades to neutral instead of
+                # trading on a fabrication). ``features_as_of`` carries WHEN the
+                # readings became knowable, so the session applies them only to
+                # bars at or after that moment: the loop replays a whole window,
+                # and a current reading on a historical bar would be look-ahead.
+                # ``regime`` is omitted here because the session derives it
+                # causally per bar from the closes it has actually seen.
+                intel_now = intel_holder["current"]
                 features = features_for(
                     sym,
                     news_sentiment={
-                        k: float(v) for k, v in (news_state.get("sentiment") or {}).items()
+                        k: float(v)
+                        for k, v in (news_holder["current"].get("sentiment") or {}).items()
                     },
-                    fear_greed=intel_state["fear_greed"],
-                    funding=intel_state["funding"],
-                    social=intel_state["social"],
-                    regime_direction=signed_efficiency(closes),
+                    fear_greed=intel_now["fear_greed"],
+                    funding=intel_now["funding"],
+                    social=intel_now["social"],
+                    regime_direction=None,
                 )
                 run_paper_session(
                     frame=frame_inr,
@@ -635,6 +671,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
                     categories=categories,
                     regime_adaptive=regime_adaptive,
                     features=features,
+                    features_as_of=intel_now.get("as_of"),
                 ).dispose()
             except Exception as exc:  # one bad/illiquid symbol must not break the tick
                 print(f"[serve] {sym} skipped this tick: {type(exc).__name__}: {exc}")
