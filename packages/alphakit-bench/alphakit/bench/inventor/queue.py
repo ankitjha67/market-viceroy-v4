@@ -9,6 +9,7 @@ persistence is a thin store the runner adds.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 
 from alphakit.bench.inventor.candidate import Candidate
@@ -28,6 +29,8 @@ class CandidateQueue:
     """Propose-only queue: the inventor proposes; the Operator adopts."""
 
     _items: list[QueuedCandidate] = field(default_factory=list)
+    # Adoption arrives on API request threads; guard the check-and-mark.
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     def propose(self, result: InventionResult) -> bool:
         """Queue a gate-cleared candidate. Rejects non-adoptable or duplicate names."""
@@ -47,11 +50,18 @@ class CandidateQueue:
         return [item.result for item in self._items if not item.adopted]
 
     def adopt(self, name: str) -> Candidate | None:
-        """Mark a pending candidate adopted and return it (for the paper roster)."""
-        for item in self._items:
-            if item.result.candidate.name == name and not item.adopted:
-                item.adopted = True
-                return item.result.candidate
+        """Mark a pending candidate adopted and return it (for the paper roster).
+
+        Thread-safe and idempotent per candidate: the check-and-mark runs under a
+        lock, so two concurrent adopt calls (a double-click, or a client retry on
+        a slow response) cannot both win and add the same strategy twice, which
+        would silently double its weight in every later ensemble decision.
+        """
+        with self._lock:
+            for item in self._items:
+                if item.result.candidate.name == name and not item.adopted:
+                    item.adopted = True
+                    return item.result.candidate
         return None
 
 
