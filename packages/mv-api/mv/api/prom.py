@@ -10,6 +10,7 @@ unknown are omitted, never emitted as zero. Pure and unit-tested; the
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 
@@ -18,11 +19,13 @@ def _escape_label(value: str) -> str:
 
 
 def _num(value: Any) -> float | None:
+    """A finite float, or None. NaN/Inf are worse than a missing sample: they
+    poison every rate/average computed over the series."""
     try:
         out = float(value)
     except (TypeError, ValueError):
         return None
-    return out
+    return out if math.isfinite(out) else None
 
 
 def prometheus_text(
@@ -54,20 +57,23 @@ def prometheus_text(
     lines.append("# TYPE mv_kill_switch_tripped gauge")
     lines.append(f"mv_kill_switch_tripped {1 if kill_tripped else 0}")
 
-    if sources:
-        lines.append("# TYPE mv_source_latency_p50_ms gauge")
-        lines.append("# TYPE mv_source_latency_p95_ms gauge")
-        lines.append("# TYPE mv_source_quota_burn_pct gauge")
-        for row in sources:
-            source = _escape_label(str(row.get("source", "unknown")))
-            for metric, key in (
-                ("mv_source_latency_p50_ms", "latency_p50_ms"),
-                ("mv_source_latency_p95_ms", "latency_p95_ms"),
-                ("mv_source_quota_burn_pct", "quota_burn_pct"),
-            ):
-                value = _num(row.get(key))
-                if value is not None:
-                    lines.append(f'{metric}{{source="{source}"}} {value}')
+    # One contiguous group per metric family: the text format requires all
+    # samples of a metric to sit together, and interleaving them by source
+    # (family reopened per row) is rejected by promtool and OpenMetrics-strict
+    # scrapers even though Prometheus's own parser tolerates it.
+    for metric, key in (
+        ("mv_source_latency_p50_ms", "latency_p50_ms"),
+        ("mv_source_latency_p95_ms", "latency_p95_ms"),
+        ("mv_source_quota_burn_pct", "quota_burn_pct"),
+    ):
+        samples = [
+            f'{metric}{{source="{_escape_label(str(row.get("source", "unknown")))}"}} {value}'
+            for row in sources
+            if (value := _num(row.get(key))) is not None
+        ]
+        if samples:
+            lines.append(f"# TYPE {metric} gauge")
+            lines.extend(samples)
 
     return "\n".join(lines) + "\n"
 
