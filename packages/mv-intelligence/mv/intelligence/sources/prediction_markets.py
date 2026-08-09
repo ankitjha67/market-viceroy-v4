@@ -26,17 +26,34 @@ class EventProbability:
     volume_usd: float
 
 
-def _first_yes_price(raw_prices: Any) -> float | None:
-    # Gamma API returns outcomePrices as a JSON-encoded list of strings.
-    if isinstance(raw_prices, str):
+def _decode_list(raw: Any) -> list[Any] | None:
+    """Gamma returns these arrays as JSON-encoded strings (or plain lists)."""
+    if isinstance(raw, str):
         try:
-            raw_prices = json.loads(raw_prices)
+            raw = json.loads(raw)
         except ValueError:
             return None
-    if not isinstance(raw_prices, list) or not raw_prices:
+    return raw if isinstance(raw, list) else None
+
+
+def _yes_price(raw_prices: Any, raw_outcomes: Any) -> float | None:
+    """The price of the YES outcome, matched by NAME.
+
+    Index 0 is not guaranteed to be YES: markets are published with either
+    ordering, and multi-candidate markets have no YES at all. Taking the first
+    price therefore labelled a NO price (or a candidate's price) as the implied
+    YES probability. A market with no YES outcome is not a yes/no question and
+    is dropped rather than misreported.
+    """
+    prices = _decode_list(raw_prices)
+    outcomes = _decode_list(raw_outcomes)
+    if not prices or not outcomes or len(prices) != len(outcomes):
+        return None
+    index = next((i for i, name in enumerate(outcomes) if str(name).strip().lower() == "yes"), None)
+    if index is None:
         return None
     try:
-        price = float(raw_prices[0])
+        price = float(prices[index])
     except (TypeError, ValueError):
         return None
     return price if 0.0 <= price <= 1.0 else None
@@ -47,7 +64,7 @@ def parse_markets(payload: list[dict[str, Any]]) -> list[EventProbability]:
     out: list[EventProbability] = []
     for market in payload or []:
         question = str(market.get("question") or "").strip()
-        prob = _first_yes_price(market.get("outcomePrices"))
+        prob = _yes_price(market.get("outcomePrices"), market.get("outcomes"))
         if not question or prob is None:
             continue
         try:

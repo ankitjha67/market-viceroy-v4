@@ -67,17 +67,24 @@ def posts_to_news_items(posts: list[RedditPost]) -> list[NewsItem]:
 def social_sentiment(posts: list[RedditPost]) -> float | None:
     """Aggregate lexicon sentiment over post titles; ``None`` when no coverage.
 
-    Each title's score is weighted by the crowd's reception (upvotes, floored
-    at 1) so a heavily-upvoted headline moves the reading more than a stray
-    post, without any single post dominating (weights are capped at 100).
+    Only titles the lexicon actually scores contribute. A listing is mostly
+    housekeeping ("Daily Discussion Thread"), which the lexicon scores 0.0;
+    averaging those in treated "no opinion" as "neutral opinion" and diluted a
+    real reading toward zero (one bullish headline among 39 lexicon-free posts
+    read +0.025 instead of +1.0), and a listing with no scorable title at all
+    reported a fabricated 0.0 rather than admitting no coverage.
+
+    Scored titles are weighted by the crowd's reception (upvotes, floored at 1,
+    capped at 100 so no single post dominates).
     """
-    if not posts:
-        return None
     weighted = 0.0
     total = 0.0
     for post in posts:
+        score = score_text(post.title)
+        if score == 0.0:
+            continue  # no lexicon coverage: not evidence of neutrality
         weight = float(min(100, max(1, post.score)))
-        weighted += score_text(post.title) * weight
+        weighted += score * weight
         total += weight
     return round(weighted / total, 4) if total else None
 

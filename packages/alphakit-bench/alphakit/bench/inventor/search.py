@@ -44,10 +44,38 @@ def full_search(
     out: list[Candidate] = []
     for candidate in (*base, *genetic, *proposed):
         key = (candidate.strategy, candidate.params)
-        if key not in seen:
-            seen.add(key)
-            out.append(candidate)
+        # The caller's predicate binds EVERY generator, not just the grid: an
+        # interpolating mutation can walk a param past its partner (fast over
+        # slow), and the LLM fallback re-derives exact grid points the search
+        # already rejected. Both were re-entering the gate unchecked.
+        if key in seen or (
+            valid is not None and not valid(candidate.strategy, candidate.param_dict)
+        ):
+            continue
+        seen.add(key)
+        out.append(candidate)
     return out
 
 
-__all__ = ["full_search"]
+def round_robin(candidates: list[Candidate], limit: int) -> list[Candidate]:
+    """Take ``limit`` candidates spread across strategies, not the first N.
+
+    ``full_search`` returns grid rows first, grouped by strategy, so a plain
+    ``[:limit]`` graded only the first one or two families and never reached the
+    genetic or LLM candidates at all. Cycling by strategy keeps the sample
+    representative of what the search actually produced.
+    """
+    if limit <= 0:
+        return []
+    buckets: dict[str, list[Candidate]] = {}
+    for candidate in candidates:
+        buckets.setdefault(candidate.strategy, []).append(candidate)
+    out: list[Candidate] = []
+    while len(out) < limit and any(buckets.values()):
+        for queue in buckets.values():
+            if queue and len(out) < limit:
+                out.append(queue.pop(0))
+    return out
+
+
+__all__ = ["full_search", "round_robin"]

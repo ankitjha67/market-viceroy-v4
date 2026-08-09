@@ -20,6 +20,7 @@ from alphakit.bench.inventor import (
     InventionResult,
     candidate_evaluator,
     full_search,
+    round_robin,
     run_inventor,
     valid_combo,
 )
@@ -56,7 +57,10 @@ def run_crypto_inventor(
     ``limit`` caps the search (each candidate is a full gate run). The queue holds
     only the gate-cleared survivors, awaiting the Operator's one-click adoption.
     """
-    candidates = full_search(list(DEFAULT_GRIDS), valid=valid_combo)[:limit]
+    # Spread the sample across strategies: full_search returns grid rows grouped
+    # by strategy, so taking the first N graded only the first one or two
+    # families and never reached the genetic or LLM candidates at all.
+    candidates = round_robin(full_search(list(DEFAULT_GRIDS), valid=valid_combo), limit)
     gate = ValidationGate(n_trials=max(len(candidates), 1), trials_sharpe_std=1.0)
     evaluate = candidate_evaluator(prices, data_source=data_source, gate=gate)
     results = run_inventor(candidates, evaluate)
