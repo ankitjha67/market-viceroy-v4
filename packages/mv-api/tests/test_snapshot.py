@@ -41,9 +41,35 @@ def test_portfolio_shape_and_values() -> None:
     assert p == {
         "equity": "1010",
         "day_pnl": "10",
+        "session_pnl": "10",
         "drawdown": "0",
         "peak_equity": "1010",
+        "day_start_equity": "1000",
     }
+
+
+def test_day_pnl_is_today_not_the_whole_session() -> None:
+    # A multi-day run must not report every day's profit as "today": day_pnl is
+    # measured against the equity at the last day roll, session_pnl since launch.
+    fills = [_fill("BUY", "1", "100"), _fill("SELL", "1", "110")]  # +10 realized
+    p = portfolio_from_fills(
+        fills,
+        Decimal("1000"),
+        peak_equity=Decimal("1008"),
+        day_start_equity=Decimal("1006"),  # started today at 1006
+    )
+    assert p["equity"] == "1010"
+    assert p["day_pnl"] == "4"  # today: 1010 - 1006
+    assert p["session_pnl"] == "10"  # since launch
+
+
+def test_drawdown_is_clamped_for_a_negative_book() -> None:
+    # An unbounded short can drive equity negative; drawdown must stay a ratio
+    # in [0, 1] rather than rendering an impossible figure like 120 percent.
+    fills = [_fill("SELL", "1", "100"), _fill("BUY", "1", "1300")]  # -1200 realized
+    p = portfolio_from_fills(fills, Decimal("1000"), peak_equity=Decimal("1000"))
+    assert Decimal(p["equity"]) < 0
+    assert p["drawdown"] == "1"
 
 
 def test_portfolio_peak_never_below_start_on_loss() -> None:

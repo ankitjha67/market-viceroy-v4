@@ -228,7 +228,9 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     import argparse
     import threading
     import time
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
+
+    ist_zone = timezone(timedelta(hours=5, minutes=30))  # the Operator's trading day
 
     import polars as pl
     import uvicorn
@@ -356,9 +358,15 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     start_equity = resolve_start_equity(ns.capital, os.environ.get("MV_START_EQUITY"))  # INR book
     per_symbol_equity = start_equity / len(symbols)  # the sizing slice per instrument
     mode = "agents" if ns.agents else "ensemble"
-    fx_rate = usd_inr_rate(
-        router, fallback=_inr_fallback()
-    )  # live USD->INR via the FX governor; fixed fallback offline
+    # The session's USD->INR translation rate, fixed at launch and NEVER changed
+    # mid-run. The window holds raw USD bars that are re-scaled every tick, so a
+    # mid-session rate change would retroactively restate every already-closed
+    # trade: a routine 1 percent FX move silently repriced historical PnL, and
+    # because the equity peak only ratchets up, that manufactured a permanent
+    # drawdown the book never suffered. Fixing the rate isolates strategy edge
+    # from FX noise, which is what the paper session is measuring. Restart to
+    # adopt a newer rate.
+    fx_rate = usd_inr_rate(router, fallback=_inr_fallback())
 
     # Time series for the live equity curve + per-symbol growing windows (anchored
     # at launch) so equity accumulates from ₹5000 as new bars close. ``peak_equity``
@@ -366,6 +374,16 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     history: list[dict[str, Any]] = []
     working_frames: dict[str, pl.DataFrame] = {}
     peak_equity = start_equity
+    # The max drawdown is threaded as its own high-water mark. Recomputing it
+    # from ``history`` was wrong once that list is trimmed: the trimmed curve no
+    # longer contains the old peak, so "Max DD" could render SMALLER than the
+    # current drawdown, which is impossible by definition.
+    peak_drawdown = Decimal("0")
+    # Equity at the last trading-day roll, so "Day P&L" means today rather than
+    # everything since launch. Rolls on the IST calendar date (the Operator's
+    # zone); UTC internally everywhere else.
+    day_start_equity = start_equity
+    day_stamp = ""
     news_state: dict[str, Any] = {"sentiment": {}, "headlines": []}
     # Real source telemetry: the loop times every fetch into this, and the health
     # panel reports measured latency + request-rate quota (not placeholder zeros).
@@ -528,8 +546,15 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
 
     def metrics_view() -> dict[str, Any]:
         # Live performance panel: trade stats + equity-curve risk (Phase 11).
-        equity_curve = [Decimal(str(point["equity"])) for point in history]
-        return performance_metrics(equity_curve, _closed_trades())
+        equity_curve = [Decimal(str(point["equity"])) for point in list(history)]
+        panel = performance_metrics(equity_curve, _closed_trades())
+        if panel:
+            # Report the threaded high-water drawdown, not the one recomputed
+            # from a trimmed curve (which can understate it, even below the
+            # current drawdown). Whichever is larger is the honest maximum.
+            from_curve = Decimal(str(panel.get("max_drawdown", "0")))
+            panel["max_drawdown"] = str(max(from_curve, peak_drawdown))
+        return panel
 
     def trades_view() -> list[dict[str, Any]]:
         # Trade blotter: the journal's closed round trips (Phase 11).
@@ -562,7 +587,7 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     def run_tick() -> None:
         """Run a paper session per watchlist symbol into one shared journal, then
         swap the aggregated view (equity / positions / metrics span all symbols)."""
-        nonlocal peak_equity
+        nonlocal peak_equity, peak_drawdown, day_start_equity, day_stamp
         journal = Journal()
         marks: dict[str, Decimal] = {}
         frames_inr: dict[str, pl.DataFrame] = {}
@@ -623,9 +648,24 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
 
         entries = list(journal.entries())
         fills = [fill_from_journal(e.payload, ts=e.ts) for e in entries if e.kind == "execution"]
-        portfolio = portfolio_from_fills(fills, start_equity, marks=marks, peak_equity=peak_equity)
+        # Roll the day base at the IST calendar-date change so "Day P&L" is today.
+        today = datetime.now(timezone.utc).astimezone(ist_zone).strftime("%Y-%m-%d")
+        if day_stamp and today != day_stamp:
+            day_start_equity = Decimal(view["portfolio"].get("equity", str(start_equity)))
+        day_stamp = today
+        portfolio = portfolio_from_fills(
+            fills,
+            start_equity,
+            marks=marks,
+            peak_equity=peak_equity,
+            day_start_equity=day_start_equity,
+        )
         positions = positions_from_fills(fills, marks=marks)
         peak_equity = Decimal(portfolio["peak_equity"])
+        # Thread the max-drawdown high-water mark (never recomputed from the
+        # trimmed history, which would let Max DD fall below current drawdown).
+        peak_drawdown = max(peak_drawdown, Decimal(portfolio["drawdown"]))
+        portfolio["max_drawdown"] = str(peak_drawdown)
         decisions = sum(1 for e in entries if e.kind == "decision")
 
         # The price chart focuses on one symbol — its candles + its own fills.
@@ -694,7 +734,6 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     if ns.watch:
 
         def watch_loop() -> None:
-            nonlocal fx_rate
             ticks = 0
             while True:
                 time.sleep(ns.interval)
@@ -703,8 +742,8 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
                     continue
                 try:
                     ticks += 1
-                    if ticks % 30 == 0:  # refresh the (daily) FX rate periodically
-                        fx_rate = usd_inr_rate(router, fallback=_inr_fallback())
+                    # No mid-session FX rebind: the session's translation rate is
+                    # fixed at launch so historical trades are never restated.
                     run_tick()
                     if ticks % 5 == 0:  # news + intel move slower than bars
                         refresh_news()
