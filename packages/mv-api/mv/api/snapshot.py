@@ -65,27 +65,35 @@ def portfolio_from_fills(
     start_equity: Decimal,
     marks: Mapping[str, Decimal] | None = None,
     peak_equity: Decimal | None = None,
+    day_start_equity: Decimal | None = None,
 ) -> dict[str, Any]:
     """Build the Command Deck portfolio summary (the ``/api/v1/portfolio`` shape).
 
     ``equity`` is the starting equity plus realized P&L (closed round trips) plus
     the **unrealized** mark-to-market of the open positions (marked to the live
-    prices in ``marks``); ``day_pnl`` is realized + unrealized. ``drawdown`` is the
-    decline from the running ``peak_equity`` the caller threads across ticks (so it
-    reflects the real high-water mark, not just this tick); when omitted it falls
-    back to ``max(start_equity, equity)`` for the one-shot case. Money is rendered
-    as strings (the UI formats, never re-computes as float).
+    prices in ``marks``). ``session_pnl`` is the whole run's realized+unrealized;
+    ``day_pnl`` is measured against ``day_start_equity``, the equity at the last
+    trading-day roll the caller threads in, so a multi-day run does not report
+    three days of profit as "today" (when omitted the two are equal, which is the
+    correct reading for a one-shot session). ``drawdown`` is the decline from the
+    running ``peak_equity`` threaded across ticks, clamped to [0, 1] so a
+    negative-equity book cannot render an impossible figure. Money is rendered as
+    strings (the UI formats, never re-computes as float).
     """
     realized = realized_pnl(fills)
     unrealized = unrealized_pnl(fills, marks)
     equity = start_equity + realized + unrealized
     peak = max(peak_equity if peak_equity is not None else start_equity, equity)
-    drawdown = (peak - equity) / peak if peak > _ZERO else _ZERO
+    raw_drawdown = (peak - equity) / peak if peak > _ZERO else _ZERO
+    drawdown = min(Decimal("1"), max(_ZERO, raw_drawdown))
+    day_base = day_start_equity if day_start_equity is not None else start_equity
     return {
         "equity": str(equity),
-        "day_pnl": str(realized + unrealized),
+        "day_pnl": str(equity - day_base),
+        "session_pnl": str(realized + unrealized),
         "drawdown": str(drawdown),
         "peak_equity": str(peak),
+        "day_start_equity": str(day_base),
     }
 
 

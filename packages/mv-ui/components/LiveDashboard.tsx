@@ -95,6 +95,11 @@ export function LiveDashboard() {
         <StatePanel state={portfolio.state} error="Portfolio summary unavailable." emptyMessage="No portfolio yet.">
           <Stat label="Equity" value={p ? formatMoney(p.equity) : ""} />
           <Stat label="Day P&L" value={p ? formatMoney(p.day_pnl) : ""} sign={p?.day_pnl} />
+          <Stat
+            label="Session P&L"
+            value={p?.session_pnl ? formatMoney(p.session_pnl) : ""}
+            sign={p?.session_pnl}
+          />
           <div className={styles.gaugeWrap}>
             <div className={styles.statLabel}>Drawdown</div>
             <div className={`${styles.statValue} mono`}>{p ? formatPct(p.drawdown) : ""}</div>

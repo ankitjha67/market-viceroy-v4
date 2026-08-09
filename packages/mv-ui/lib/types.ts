@@ -9,9 +9,15 @@ export interface Health {
 
 export interface Portfolio {
   equity: string;
+  /** Today only, measured from the equity at the last trading-day roll. */
   day_pnl: string;
+  /** Whole run since launch (optional: absent on a one-shot session payload). */
+  session_pnl?: string;
   drawdown: string;
   peak_equity: string;
+  day_start_equity?: string;
+  /** The threaded high-water drawdown (the serve loop adds this). */
+  max_drawdown?: string;
 }
 
 /** One tick on the live equity curve (the continuous --watch loop appends these). */
