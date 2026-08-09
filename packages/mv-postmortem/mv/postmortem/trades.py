@@ -207,12 +207,23 @@ def fill_from_journal(payload: Mapping[str, Any], *, ts: datetime) -> Fill:
     / ``fees`` (Phase 5); older entries without them degrade gracefully (the
     intended/reference prices fall back to the fill price, fees to 0).
     """
+    # Prefer the BAR the fill landed on. ``ts`` is when the entry was appended,
+    # which during a replay tick is the same wall-clock instant for the whole
+    # window -- that made every blotter row read "held 0s" and collapsed the
+    # opened/closed times of trades that were actually hours apart.
+    bar_ts = payload.get("bar_ts")
+    when = ts
+    if isinstance(bar_ts, str):
+        try:
+            when = datetime.fromisoformat(bar_ts)
+        except ValueError:
+            when = ts
     return Fill(
         instrument=str(payload["symbol"]),
         side=str(payload["side"]),
         qty=Decimal(str(payload["qty"])),
         fill_price=Decimal(str(payload["price"])),
-        ts=ts,
+        ts=when,
         intended_price=_maybe_decimal(payload.get("intended_price")),
         decision_ref_price=_maybe_decimal(payload.get("decision_ref_price")),
         fees=Decimal(str(payload.get("fees", "0"))),

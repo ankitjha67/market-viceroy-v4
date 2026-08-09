@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from decimal import Decimal
+from itertools import pairwise
 from typing import Any
 
 import pandas as pd
@@ -67,6 +68,9 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         regime_adaptive: bool = True,
         features: Mapping[str, float] | None = None,
         features_as_of: datetime | None = None,
+        skip_transitional: bool = False,
+        stop_atr_mult: float = 0.0,
+        max_hold_bars: int = 0,
     ) -> None:
         super().__init__()
         self._instrument = instrument
@@ -83,6 +87,7 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         # Regime-adaptive ensemble weighting: when on (default) and categories are
         # known, the family weights track the detected market regime each bar.
         self._categories = categories if regime_adaptive else None
+        self._skip_transitional = skip_transitional
         # Point-in-time intel features for the agent path (Phase 14, FR-A2).
         # ``features_as_of`` is the moment those readings became knowable: the
         # session replays a whole window, so applying a current reading to every
@@ -102,6 +107,14 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         # price moves between legs (it can read flat while long, or short while
         # flat, which then suppresses exits and misreports exposure to risk).
         self._position_qty = Decimal("0")
+        # Protective-exit state: where the open position was entered and how many
+        # bars ago. Without these the only exit is a signal flip, so a losing
+        # position rides until the ensemble changes its mind -- which is what
+        # produces the fat left tail (downside deviation) that sinks Sortino.
+        self._entry_price = Decimal("0")
+        self._bars_in_trade = 0
+        self._stop_atr_mult = stop_atr_mult
+        self._max_hold_bars = max_hold_bars
         self._last_price = Decimal("0")
         self._last_ts = datetime.fromtimestamp(0, tz=timezone.utc)  # the latest bar's time
 
@@ -109,6 +122,35 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
     def bars_seen(self) -> list[float]:
         """Every bar close this strategy actually processed (halt detection)."""
         return self._closes
+
+    def _volatility_unit(self, lookback: int = 14) -> Decimal:
+        """A close-based ATR proxy: the mean absolute bar-to-bar move.
+
+        The strategy only keeps closes, so this is a true-range stand-in rather
+        than a real ATR (no intrabar high/low). It is the same order of magnitude
+        and is what the stop distance is quoted in.
+        """
+        if len(self._closes) < 2:
+            return Decimal("0")
+        window = self._closes[-(lookback + 1) :]
+        moves = [abs(b - a) for a, b in pairwise(window)]
+        if not moves:
+            return Decimal("0")
+        return Decimal(str(sum(moves) / len(moves)))
+
+    def _protective_exit_reason(self) -> str | None:
+        """Why the open position must be closed now, or None to keep holding."""
+        if self._max_hold_bars > 0 and self._bars_in_trade >= self._max_hold_bars:
+            return f"time stop: held {self._bars_in_trade} bars"
+        if self._stop_atr_mult > 0 and self._entry_price > 0:
+            unit = self._volatility_unit()
+            if unit > 0:
+                direction = Decimal(1) if self._position_qty > 0 else Decimal(-1)
+                adverse = (self._entry_price - self._last_price) * direction
+                limit = Decimal(str(self._stop_atr_mult)) * unit
+                if adverse >= limit:
+                    return f"stop: {self._stop_atr_mult}x volatility unit against entry"
+        return None
 
     def _features_at(self, ts: datetime) -> dict[str, float]:
         """The features knowable at bar ``ts`` (as-of; no look-ahead).
@@ -137,6 +179,24 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         self._times.append(ts)
         if len(self._closes) < self._warmup:
             return
+
+        if self._position_qty != 0:
+            self._bars_in_trade += 1
+            reason = self._protective_exit_reason()
+            if reason is not None:
+                self._journal.append(
+                    "protective_exit",
+                    {
+                        "symbol": self._symbol,
+                        "reason": reason,
+                        "entry": str(self._entry_price),
+                        "mark": str(self._last_price),
+                        "bars_held": self._bars_in_trade,
+                    },
+                )
+                side = "SELL" if self._position_qty > 0 else "BUY"
+                self._submit(side, (self._position_qty * self._last_price).copy_abs())
+                return
 
         window = pd.DataFrame({self._symbol: self._closes}, index=pd.DatetimeIndex(self._times))
         snapshot_id = f"{self._symbol}:{ts.isoformat()}"
@@ -190,6 +250,7 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
             portfolio_state=state,
             hold_threshold=self._hold_threshold,
             categories=self._categories,
+            skip_transitional=self._skip_transitional,
         )
 
     def _record(self, gated: GatedDecision) -> None:
@@ -236,7 +297,16 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         fill_price = Decimal(str(event.last_px.as_double()))
         qty = Decimal(str(event.last_qty.as_double()))
         is_buy = event.order_side == OrderSide.BUY
+        was_flat = self._position_qty == 0
         self._position_qty += qty if is_buy else -qty
+        # Track the entry the protective exits measure against: a fill that opens
+        # (or flips into) a position resets the reference; closing to flat clears it.
+        if self._position_qty == 0:
+            self._entry_price = Decimal("0")
+            self._bars_in_trade = 0
+        elif was_flat or self._entry_price == 0:
+            self._entry_price = fill_price
+            self._bars_in_trade = 0
         # This leg's signed traded notional (a cash flow, not the position).
         leg_notional = qty * fill_price if is_buy else -(qty * fill_price)
         # Enrich the fill with the references attribution needs (Phase 5, FR-P1):
@@ -320,6 +390,9 @@ def run_paper_session(
     regime_adaptive: bool = True,
     features: Mapping[str, float] | None = None,
     features_as_of: datetime | None = None,
+    skip_transitional: bool = False,
+    stop_atr_mult: float = 0.0,
+    max_hold_bars: int = 0,
 ) -> Any:
     """Run one paper session over ``frame`` and return the engine (for inspection).
 
@@ -350,6 +423,9 @@ def run_paper_session(
         regime_adaptive=regime_adaptive,
         features=features,
         features_as_of=features_as_of,
+        skip_transitional=skip_transitional,
+        stop_atr_mult=stop_atr_mult,
+        max_hold_bars=max_hold_bars,
     )
     bars = bars_from_frame(frame, bar_type, instrument)
     engine.add_data(bars)

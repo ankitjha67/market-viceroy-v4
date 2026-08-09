@@ -145,6 +145,7 @@ def decide(
     categories: Mapping[str, str] | None = None,
     regime_lookback: int = 30,
     regime_floor: float = 0.1,
+    skip_transitional: bool = False,
 ) -> GatedDecision:
     """Run strategies -> (regime-weighted) ensemble -> size -> risk gate.
 
@@ -178,6 +179,18 @@ def decide(
         weights=weights,
         note=note,
     )
+    # Regime no-trade band: in a transitional tape (neither trending enough for
+    # the trend family nor choppy enough for mean reversion) the ensemble's
+    # consensus is weakest and the round-trip fee is unchanged, so those trades
+    # are the ones that bleed. Standing aside is a real position.
+    if skip_transitional and regime is not None and regime.label == "transitional":
+        proposed = proposed.model_copy(
+            update={
+                "action": "HOLD",
+                "target_size": Decimal("0"),
+                "rationale": f"{proposed.rationale} | stand aside: transitional regime",
+            }
+        )
     gated = gate_proposed_trade(
         proposed,
         symbol=symbol,
