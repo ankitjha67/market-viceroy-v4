@@ -249,6 +249,101 @@ def test_agent_loop_receives_intel_features_end_to_end() -> None:
         engine.dispose()
 
 
+def _oscillating_frame(n: int) -> pl.DataFrame:
+    """Drift plus oscillation: makes the mean-reversion roster emit real shorts."""
+    import math
+
+    rows = []
+    for i in range(n):
+        price = 40_000.0 + i * 20.0 + 900.0 * math.sin(i / 7.0)
+        rows.append([_BASE_MS + i * _HOUR_MS, price, price * 1.01, price * 0.99, price, 50.0])
+    return normalize_ohlcv(
+        rows, venue="binance", symbol="BTC/USDT", timeframe="1h", source="ccxt:binance"
+    )
+
+
+def _run_window(n: int, strategies: list[SignalStrategy]) -> tuple[int, list[str]]:
+    journal = Journal()
+    engine = run_paper_session(
+        frame=_oscillating_frame(n),
+        symbol="BTC/USDT",
+        timeframe="1h",
+        strategies=strategies,
+        risk_engine=RiskEngine(RiskLimits.aggressive(), KillSwitch()),
+        journal=journal,
+        instrument=TestInstrumentProvider.btcusdt_binance(),
+        warmup=30,
+        starting_equity=Decimal("500"),
+    )
+    try:
+        kinds = [e.kind for e in journal.entries()]
+        return kinds.count("decision"), kinds
+    finally:
+        engine.dispose()
+
+
+def test_long_short_roster_runs_the_whole_window_without_halting() -> None:
+    # Regression: a CASH venue cannot hold the short side the mean-reversion
+    # strategies emit, so the first sell past flat drove the base balance
+    # negative and NautilusTrader stopped the engine mid-window -- silently,
+    # because logging is bypassed. The symptom was an identical decision count
+    # at every window size. A margin venue at leverage 1.0 permits the short
+    # without granting leverage, so the session must now scale with the window.
+    from alphakit.strategies.meanrev.rsi_reversion_2 import RSIReversion2
+    from alphakit.strategies.meanrev.zscore_reversion import ZScoreReversion
+
+    roster: list[SignalStrategy] = [
+        EMACross1226(long_only=True),
+        SMACross1030(),
+        RSIReversion2(),
+        ZScoreReversion(),
+    ]
+    short_n, short_kinds = _run_window(120, roster)
+    long_n, long_kinds = _run_window(220, roster)
+
+    assert short_n == 120 - 30 + 1  # every post-warmup bar decided
+    assert long_n == 220 - 30 + 1
+    assert long_n > short_n  # scales with the window: the halt is gone
+    assert "session_halted" not in short_kinds
+    assert "session_halted" not in long_kinds
+
+
+def test_engine_halt_is_journaled_not_silent() -> None:
+    # The detector itself: on a CASH venue the same roster still halts, and that
+    # must be visible in the journal rather than looking like a quiet market.
+    from typing import Any
+    from unittest.mock import patch
+
+    import mv.api.paper_loop as loop_mod
+    from alphakit.bridges.nautilus_bridge import make_paper_engine
+    from alphakit.strategies.meanrev.rsi_reversion_2 import RSIReversion2
+    from nautilus_trader.model.enums import AccountType
+
+    def cash_engine(**kwargs: Any) -> Any:
+        kwargs["account_type"] = AccountType.CASH
+        return make_paper_engine(**kwargs)
+
+    journal = Journal()
+    with patch.object(loop_mod, "make_paper_engine", cash_engine):
+        engine = run_paper_session(
+            frame=_oscillating_frame(200),
+            symbol="BTC/USDT",
+            timeframe="1h",
+            strategies=[EMACross1226(long_only=True), RSIReversion2()],
+            risk_engine=RiskEngine(RiskLimits.aggressive(), KillSwitch()),
+            journal=journal,
+            instrument=TestInstrumentProvider.btcusdt_binance(),
+            warmup=30,
+            starting_equity=Decimal("500"),
+        )
+    try:
+        halts = [e.payload for e in journal.entries() if e.kind == "session_halted"]
+        assert halts, "a mid-window engine stop must be journaled, never silent"
+        assert halts[0]["bars_processed"] < halts[0]["bars_fed"]
+    finally:
+        engine.dispose()
+
+
 def test_live_mode_blocks_ungraduated_strategy() -> None:
     # BR-005: in live mode an ungraduated symbol produces no order — journaled.
     from mv.risk.live_guard import LiveGuardConfig

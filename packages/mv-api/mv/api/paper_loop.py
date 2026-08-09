@@ -87,9 +87,19 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
         self._features: Mapping[str, float] = dict(features or {})
         self._closes: list[float] = []
         self._times: list[datetime] = []
-        self._position_notional = Decimal("0")
+        # The live position as a SIGNED QUANTITY (long > 0, short < 0). Notional
+        # is derived at the current mark, never accumulated: summing each leg's
+        # own fill notional desynchronizes from the real position as soon as
+        # price moves between legs (it can read flat while long, or short while
+        # flat, which then suppresses exits and misreports exposure to risk).
+        self._position_qty = Decimal("0")
         self._last_price = Decimal("0")
         self._last_ts = datetime.fromtimestamp(0, tz=timezone.utc)  # the latest bar's time
+
+    @property
+    def bars_seen(self) -> list[float]:
+        """Every bar close this strategy actually processed (halt detection)."""
+        return self._closes
 
     def on_start(self) -> None:
         self.subscribe_bars(self._bar_type)
@@ -106,20 +116,23 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
 
         window = pd.DataFrame({self._symbol: self._closes}, index=pd.DatetimeIndex(self._times))
         snapshot_id = f"{self._symbol}:{ts.isoformat()}"
+        # Exposure is the position marked at the CURRENT price, not the sum of
+        # historical fill notionals (see _position_qty).
+        position_notional = self._position_qty * self._last_price
         state = PortfolioState(
             equity=self._equity,
             peak_equity=self._equity,
             day_start_equity=self._equity,
-            gross_exposure=self._position_notional.copy_abs(),
-            net_exposure=self._position_notional,
-            positions={self._symbol: self._position_notional},
+            gross_exposure=position_notional.copy_abs(),
+            net_exposure=position_notional,
+            positions={self._symbol: position_notional},
         )
         gated = self._decide(window, ts, snapshot_id, state)
         self._record(gated)
 
         if gated.execute and gated.side is not None:
             desired = 1 if gated.side == "BUY" else -1
-            if desired != _sign(self._position_notional):
+            if desired != _sign(self._position_qty):
                 notional = gated.notional
                 if self._live_guard is not None:
                     decision = gate_live_order(
@@ -198,10 +211,10 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
     def on_order_filled(self, event: Any) -> None:
         fill_price = Decimal(str(event.last_px.as_double()))
         qty = Decimal(str(event.last_qty.as_double()))
-        signed = qty * fill_price
-        if event.order_side != OrderSide.BUY:
-            signed = -signed
-        self._position_notional += signed
+        is_buy = event.order_side == OrderSide.BUY
+        self._position_qty += qty if is_buy else -qty
+        # This leg's signed traded notional (a cash flow, not the position).
+        leg_notional = qty * fill_price if is_buy else -(qty * fill_price)
         # Enrich the fill with the references attribution needs (Phase 5, FR-P1):
         # the intended/decision-reference price (the bar close the decision saw),
         # the realized fees, and the execution slippage vs intended.
@@ -217,10 +230,10 @@ class EnsembleStrategy(Strategy):  # type: ignore[misc]  # nautilus_trader is un
             "execution",
             {
                 "symbol": self._symbol,
-                "side": "BUY" if event.order_side == OrderSide.BUY else "SELL",
+                "side": "BUY" if is_buy else "SELL",
                 "price": str(fill_price),
                 "qty": str(qty),
-                "notional": str(signed),
+                "notional": str(leg_notional),
                 "intended_price": str(intended),
                 "decision_ref_price": str(intended),
                 "fees": str(fees),
@@ -312,7 +325,24 @@ def run_paper_session(
         regime_adaptive=regime_adaptive,
         features=features,
     )
-    engine.add_data(bars_from_frame(frame, bar_type, instrument))
+    bars = bars_from_frame(frame, bar_type, instrument)
+    engine.add_data(bars)
     engine.add_strategy(strategy)
     engine.run()
+    # A venue-side failure (e.g. an account-balance breach) stops the engine
+    # mid-window, and NautilusTrader's logging is bypassed, so the run would
+    # otherwise end early in total silence and look like a quiet market. Compare
+    # bars fed against bars actually processed and journal the shortfall.
+    fed = len(bars)
+    seen = len(strategy.bars_seen)
+    if fed and seen < fed:
+        journal.append(
+            "session_halted",
+            {
+                "symbol": symbol,
+                "bars_fed": fed,
+                "bars_processed": seen,
+                "reason": "engine stopped before the end of the window",
+            },
+        )
     return engine

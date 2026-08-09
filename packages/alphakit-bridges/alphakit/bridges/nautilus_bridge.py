@@ -18,6 +18,7 @@ objects are typed ``Any`` here (as the other bridges treat their engines).
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
@@ -55,22 +56,37 @@ def make_paper_engine(
     venue: str = "BINANCE",
     starting_balance: Decimal = Decimal("1000000"),
     currency: Any = USDT,
+    account_type: Any = AccountType.MARGIN,
+    leverage: Decimal = Decimal(1),
 ) -> Any:
-    """Build a CASH paper venue with in-venue maker/taker fees.
+    """Build a paper venue with in-venue maker/taker fees.
 
-    A multi-currency CASH wallet (``base_currency=None``) so a crypto pair debits
-    the quote currency and credits the base, with Decimal-precise balances.
-    Logging is bypassed so multiple engines can run in one process (e.g. a test
-    suite) without re-initializing NautilusTrader's global logging subsystem.
+    Defaults to a **MARGIN** account at **leverage 1.0**: that permits the
+    short side the strategy roster actually emits (the ensemble produces signed
+    weights, and the whole accounting stack models shorts) *without* granting
+    any leverage. A CASH account cannot hold a short, so the first sell past
+    flat drives the base-currency balance negative and NautilusTrader halts the
+    run mid-window — silently, because logging is bypassed. Pass
+    ``account_type=AccountType.CASH`` for a genuinely spot-only session.
+
+    Multi-currency (``base_currency=None``) so a crypto pair debits the quote
+    currency and credits the base, with Decimal-precise balances. Logging is
+    bypassed by default so multiple engines can run in one process (a test
+    suite) without re-initializing NautilusTrader's global logging subsystem;
+    set ``MV_NAUTILUS_LOGGING=1`` to surface engine errors while diagnosing.
     """
-    engine = BacktestEngine(config=BacktestEngineConfig(logging=LoggingConfig(bypass_logging=True)))
+    bypass = os.environ.get("MV_NAUTILUS_LOGGING", "") not in ("1", "true", "TRUE")
+    engine = BacktestEngine(
+        config=BacktestEngineConfig(logging=LoggingConfig(bypass_logging=bypass))
+    )
     engine.add_venue(
         venue=Venue(venue),
         oms_type=OmsType.NETTING,
-        account_type=AccountType.CASH,
+        account_type=account_type,
         base_currency=None,
         starting_balances=[Money(starting_balance, currency)],
         fee_model=MakerTakerFeeModel(),
+        default_leverage=leverage,
     )
     return engine
 
