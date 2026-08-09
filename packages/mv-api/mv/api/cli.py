@@ -133,7 +133,12 @@ def paper_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     )
     parser.add_argument("--symbol", default="BTC/USDT")
     parser.add_argument("--timeframe", default="1h")
-    parser.add_argument("--limit", type=int, default=200, help="bars to pull from the governor")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=500,
+        help="bars to pull from the governor (>=200 so the slowest strategy warms up)",
+    )
     parser.add_argument(
         "--strategies",
         default="",
@@ -276,7 +281,12 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         help="comma-separated watchlist of BASE/USDT pairs traded concurrently",
     )
     parser.add_argument("--timeframe", default="1h")
-    parser.add_argument("--limit", type=int, default=200, help="bars to pull from the governor")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=500,
+        help="bars to pull from the governor (>=200 so the slowest strategy warms up)",
+    )
     parser.add_argument(
         "--strategies",
         default="",
@@ -306,6 +316,38 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
         "--capital",
         default=None,
         help="starting paper capital in INR, split across the watchlist (default MV_START_EQUITY or 5000)",
+    )
+    # Decision-quality controls. Only the conviction floor is ON by default: it
+    # is the one change that improved Sharpe, win rate AND net on BOTH symbols
+    # measured (scripts/ab_decision_quality.py). The stops and the regime band
+    # flipped sign between BTC and SOL on 3-6 trade samples, i.e. they fit one
+    # window rather than generalising, so they ship OFF and opt-in pending real
+    # validation-gate evidence.
+    parser.add_argument(
+        "--min-conviction",
+        type=float,
+        default=0.25,
+        help=(
+            "ensemble consensus needed to trade at all (default 0.25). Every round "
+            "trip pays the venue fee twice, so weak consensus loses money on average"
+        ),
+    )
+    parser.add_argument(
+        "--skip-transitional",
+        action="store_true",
+        help="stand aside in the transitional regime (unvalidated; off by default)",
+    )
+    parser.add_argument(
+        "--stop-atr",
+        type=float,
+        default=0.0,
+        help="protective stop in volatility units against entry (unvalidated; 0 = off)",
+    )
+    parser.add_argument(
+        "--max-hold-bars",
+        type=int,
+        default=0,
+        help="time stop: close a position after N bars (unvalidated; 0 = off)",
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
@@ -527,6 +569,10 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
             "start_equity": str(start_equity),
             "fx_usd_inr": str(fx_rate),
             "weighting": "regime-adaptive" if regime_adaptive else "equal-weight",
+            "min_conviction": str(ns.min_conviction),
+            "regime_band": "stand aside" if ns.skip_transitional else "trade all regimes",
+            "stop_atr_mult": str(ns.stop_atr),
+            "max_hold_bars": str(ns.max_hold_bars),
             "regime": None,
             "watch": bool(ns.watch),
             "interval_seconds": ns.interval,
@@ -694,6 +740,10 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
                     regime_adaptive=regime_adaptive,
                     features=features,
                     features_as_of=intel_now.get("as_of"),
+                    hold_threshold=Decimal(str(ns.min_conviction)),
+                    skip_transitional=ns.skip_transitional,
+                    stop_atr_mult=ns.stop_atr,
+                    max_hold_bars=ns.max_hold_bars,
                 ).dispose()
                 produced = [(e.kind, e.payload) for e in symbol_journal.entries()]
                 tick_cache[sym] = {"signature": signature, "entries": produced}
