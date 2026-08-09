@@ -7,6 +7,7 @@ and in-memory; the runtime publishes snapshots to Redis/UI later.
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -36,12 +37,18 @@ class SourceHealth:
     failovers: int
 
 
+# Latency samples are kept in a bounded ring: the serve loop runs for weeks and
+# records a sample per source per fetch, so an unbounded list was the one
+# structure in the process that grew forever (and snapshot() sorts it).
+_MAX_LATENCY_SAMPLES = 256
+
+
 @dataclass
 class _Counters:
     successes: int = 0
     failures: int = 0
     failovers: int = 0
-    latencies_ms: list[float] = field(default_factory=list)
+    latencies_ms: deque[float] = field(default_factory=lambda: deque(maxlen=_MAX_LATENCY_SAMPLES))
 
 
 def _percentile(sorted_values: list[float], pct: float) -> float:

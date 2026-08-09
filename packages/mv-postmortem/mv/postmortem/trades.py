@@ -107,6 +107,12 @@ def _fifo_walk(fills: list[Fill]) -> tuple[list[ClosedTrade], dict[str, deque[_O
     counter = 0
 
     for fill in fills:
+        # A zero-quantity fill is not a trade. Left in, it created a lot with no
+        # remainder, and the next opposite fill matched 0 against it and emitted
+        # a phantom ClosedTrade (qty 0, PnL 0) that diluted win rate and
+        # expectancy and put an empty row in the blotter.
+        if fill.qty <= _ZERO:
+            continue
         lots = open_lots[fill.instrument]
         # Same side as the current open position (or flat) -> a new opening lot.
         if not lots or _same_side(lots[0].fill.side, fill.side):

@@ -590,6 +590,18 @@ Python 3.12 (uv workspace monorepo), Pydantic v2, mypy strict, ruff, Decimal mon
 
 Ordered by risk; each item cites its section.
 
+A second adversarial sweep (four reviewers, findings reproduced on the Operator
+machine before and after each fix) closed the items below as R13 to R17. The
+originals R1 to R12 remain as listed.
+
+| Id | Item | Status |
+|---|---|---|
+| R13 | Silent mid-window engine halt (cash venue could not hold the roster's shorts; `bypass_logging` hid the stop) and position tracked as accumulated fill notional rather than signed quantity | FIXED: margin venue at leverage 1.0, journaled `session_halted`, signed-quantity position |
+| R14 | Retroactive FX restatement manufacturing permanent drawdown; Max DD recomputed from a trimmed curve; "Day P&L" measured since launch | FIXED: session FX rate fixed at launch, threaded drawdown high-water mark, real IST day roll plus `session_pnl` |
+| R15 | Current intel readings applied to every replayed historical bar (look-ahead in agents mode); zero locks in the serving stack | FIXED: `features_as_of` gating plus causal per-bar regime; build-then-rebind publication, snapshotted deques, locked journal append and candidate adoption |
+| R16 | Tax model (TDS added rather than credited, wrong leg for shorts, fee-netted base); inventor grading a biased sample; GEX flip one-directional and fabricated on empty chains; 13F diffing value not shares; Polymarket index-0 YES; Reddit counting lexicon-free posts as neutral | FIXED (tax line relabelled `*_approx` with a stated basis) |
+| R17 | Unbounded health-latency list; full-window replay recomputed identically every tick; unclamped history payload; NaN samples and split metric families in the Prometheus text; population-stdev Sharpe; phantom zero-quantity trades | FIXED: bounded ring, per-symbol tick memoization, clamped `limit`, finite-only contiguous families, sample stdev, zero-qty guard |
+
 | Id | Item | Section | Wave |
 |---|---|---|---|
 | R1 | Mark equity to market into the risk state (breakers currently inert) | 25.3 | 1 |

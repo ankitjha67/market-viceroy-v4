@@ -219,9 +219,15 @@ def create_app(state: ApiState) -> FastAPI:
         return state.portfolio_provider()
 
     @app.get("/api/v1/portfolio/history")
-    def portfolio_history() -> list[dict[str, Any]]:
-        """Live equity curve: per-tick {ts, equity, day_pnl, decisions, ...} (Phase 10)."""
-        return state.portfolio_history_provider()
+    def portfolio_history(
+        limit: Annotated[int, Query(ge=1, le=5000)] = 1000,
+    ) -> list[dict[str, Any]]:
+        """Live equity curve: per-tick {ts, equity, day_pnl, decisions, ...} (Phase 10).
+
+        Clamped like the other list endpoints: the deck polls this every couple
+        of seconds and the untrimmed curve was the largest payload on the wire.
+        """
+        return state.portfolio_history_provider()[-limit:]
 
     @app.get("/api/v1/ohlcv")
     def ohlcv() -> dict[str, Any]:

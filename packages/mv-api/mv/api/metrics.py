@@ -31,9 +31,12 @@ def _trade_return(trade: ClosedTrade) -> float:
 
 
 def _sharpe(returns: list[float]) -> float:
+    # Trade returns are a SAMPLE, so the denominator is Bessel-corrected.
+    # Population stdev overstated Sharpe by sqrt(n/(n-1)) -- 41 percent at n=2,
+    # exactly when the deck is coldest and most likely to be over-read.
     if len(returns) < 2:
         return 0.0
-    sd = statistics.pstdev(returns)
+    sd = statistics.stdev(returns)
     return statistics.fmean(returns) / sd if sd > 0 else 0.0
 
 
@@ -42,8 +45,13 @@ def _sortino(returns: list[float]) -> float:
         return 0.0
     downside = [r for r in returns if r < 0]
     if not downside:
+        # No losing trade: mirror the profit-factor convention (a capped
+        # sentinel) rather than returning 0.0, which reads as "no risk-adjusted
+        # return" beside a 999.99 profit factor describing the same fact.
+        return float(_PF_CAP) if statistics.fmean(returns) > 0 else 0.0
+    if len(downside) < 2:
         return 0.0
-    dd = statistics.pstdev(downside)
+    dd = statistics.stdev(downside)
     return statistics.fmean(returns) / dd if dd > 0 else 0.0
 
 

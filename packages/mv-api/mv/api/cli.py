@@ -373,6 +373,9 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
     # is the running high-water mark threaded across ticks for an honest drawdown.
     history: list[dict[str, Any]] = []
     working_frames: dict[str, pl.DataFrame] = {}
+    # Per-symbol memo of the last replay: {signature, entries}. A tick whose
+    # inputs are unchanged re-emits the entries instead of replaying the window.
+    tick_cache: dict[str, dict[str, Any]] = {}
     peak_equity = start_equity
     # The max drawdown is threaded as its own high-water mark. Recomputing it
     # from ``history`` was wrong once that list is trimmed: the trimmed curve no
@@ -657,13 +660,32 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
                     social=intel_now["social"],
                     regime_direction=None,
                 )
+                # Replaying the whole window is the dominant cost of a tick, and
+                # with 1h bars on a 60s interval the window is UNCHANGED on 59
+                # of 60 ticks, producing a bit-identical decision stream. Skip
+                # the replay when nothing that feeds it has changed, and re-emit
+                # the cached entries so the shared journal (and therefore every
+                # downstream number) is exactly what a replay would have built.
+                signature = (
+                    str(frame_inr.get_column("ts").tail(1).item()) if frame_inr.height else "",
+                    frame_inr.height,
+                    len(strategies),
+                    str(intel_now.get("as_of")),
+                    tuple(sorted(features.items())),
+                )
+                cached = tick_cache.get(sym)
+                if cached is not None and cached["signature"] == signature:
+                    for kind, payload in cached["entries"]:
+                        journal.append(kind, payload)
+                    continue
+                symbol_journal = Journal()
                 run_paper_session(
                     frame=frame_inr,
                     symbol=sym,
                     timeframe=ns.timeframe,
                     strategies=strategies,
                     risk_engine=risk,
-                    journal=journal,
+                    journal=symbol_journal,
                     instrument=instruments[sym],
                     warmup=30,
                     starting_equity=per_symbol_equity,
@@ -673,6 +695,10 @@ def serve_main(argv: list[str] | None = None) -> None:  # pragma: no cover - I/O
                     features=features,
                     features_as_of=intel_now.get("as_of"),
                 ).dispose()
+                produced = [(e.kind, e.payload) for e in symbol_journal.entries()]
+                tick_cache[sym] = {"signature": signature, "entries": produced}
+                for kind, payload in produced:
+                    journal.append(kind, payload)
             except Exception as exc:  # one bad/illiquid symbol must not break the tick
                 print(f"[serve] {sym} skipped this tick: {type(exc).__name__}: {exc}")
                 continue
